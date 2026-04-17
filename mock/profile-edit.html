@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>プロフィール編集 - TalentHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/common.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body x-data="profileEditApp()" x-init="init()" x-cloak>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+    <div class="max-w-3xl mx-auto fade-in">
+
+      <!-- ページヘッダー -->
+      <div class="flex items-center gap-4 mb-6">
+        <button @click="goBack()"
+                class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+          </svg>
+          戻る
+        </button>
+        <h1 class="text-2xl font-bold text-gray-900">プロフィール編集</h1>
+      </div>
+
+      <!-- タブバー -->
+      <div class="tab-bar mb-6">
+        <button class="tab-btn" :class="activeTab === 'basic' && 'active'"
+                @click="activeTab = 'basic'">基本情報</button>
+        <button class="tab-btn" :class="activeTab === 'skills' && 'active'"
+                @click="activeTab = 'skills'">スキル</button>
+        <button class="tab-btn" :class="activeTab === 'certs' && 'active'"
+                @click="activeTab = 'certs'">資格</button>
+        <button class="tab-btn" :class="activeTab === 'personality' && 'active'"
+                @click="activeTab = 'personality'">パーソナリティ</button>
+        <button class="tab-btn" :class="activeTab === 'consultation' && 'active'"
+                @click="activeTab = 'consultation'"
+                x-show="user?.role === 'senior' || user?.role === 'admin'">相談設定</button>
+      </div>
+
+      <!-- ===== 基本情報タブ ===== -->
+      <div x-show="activeTab === 'basic'" class="card space-y-5">
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">氏名 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="editForm.name" class="form-input" placeholder="山田 太郎">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">部署 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="editForm.department" class="form-input" placeholder="開発部">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">役職</label>
+            <input type="text" x-model="editForm.grade" class="form-input" placeholder="シニアエンジニア">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">入社年</label>
+            <input type="number" x-model="editForm.joinYear" class="form-input"
+                   min="2000" max="2030" placeholder="2020">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">GitHubアカウント</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+            <input type="text" x-model="editForm.github" class="form-input pl-7" placeholder="github_username">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">自己紹介</label>
+          <textarea x-model="editForm.bio" class="form-input resize-none" rows="4"
+                    maxlength="500" placeholder="自分のスキルや経験、大切にしていることなどを書いてください"></textarea>
+          <p class="text-xs text-gray-400 mt-1 text-right">
+            <span x-text="editForm.bio.length"></span>/500
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">取り組み中</label>
+          <input type="text" x-model="editForm.currentFocus" class="form-input"
+                 maxlength="200" placeholder="最近取り組んでいることを一言で">
+        </div>
+
+        <!-- インタレストタグ -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">インタレストタグ</label>
+          <div class="flex flex-wrap gap-2 mb-2">
+            <template x-for="tag in editForm.interestTags" :key="tag">
+              <span class="skill-tag skill-tag-interest flex items-center gap-1 text-sm">
+                <span x-text="tag"></span>
+                <button @click="removeInterestTag(tag)"
+                        class="text-blue-400 hover:text-blue-700 leading-none ml-1">✕</button>
+              </span>
+            </template>
+          </div>
+          <div class="flex gap-2">
+            <input type="text" x-model="newTagInput"
+                   @keydown.enter.prevent="addInterestTag()"
+                   class="form-input flex-1 text-sm" placeholder="タグを入力してEnter">
+            <button @click="addInterestTag()"
+                    class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700
+                           text-sm rounded-lg transition-colors">追加</button>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-gray-100">
+          <button @click="saveProfile()"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium
+                         py-2.5 rounded-lg transition-colors">
+            基本情報を保存
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== スキルタブ ===== -->
+      <div x-show="activeTab === 'skills'" class="card">
+        <h2 class="text-base font-semibold text-gray-900 mb-4">スキル一覧</h2>
+
+        <div class="space-y-3 mb-4">
+          <template x-for="(skill, idx) in editForm.skills" :key="idx">
+            <div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <select x-model="skill.category"
+                      class="form-input text-sm w-36 flex-shrink-0">
+                <option value="language">言語</option>
+                <option value="framework">フレームワーク</option>
+                <option value="infra">インフラ・クラウド</option>
+                <option value="domain">ドメイン経験</option>
+              </select>
+              <input type="text" x-model="skill.name" class="form-input text-sm flex-1"
+                     placeholder="スキル名">
+              <select x-model.number="skill.level" class="form-input text-sm w-44 flex-shrink-0">
+                <option value="1">★☆☆☆☆ 初学者</option>
+                <option value="2">★★☆☆☆ 入門</option>
+                <option value="3">★★★☆☆ 実務経験あり</option>
+                <option value="4">★★★★☆ 上級</option>
+                <option value="5">★★★★★ エキスパート</option>
+              </select>
+              <button @click="removeSkill(idx)"
+                      class="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors p-1">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107
+                           1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244
+                           2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456
+                           0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114
+                           1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164
+                           -2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09
+                           2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                </svg>
+              </button>
+            </div>
+          </template>
+        </div>
+
+        <!-- スキル追加フォーム -->
+        <div class="border border-dashed border-gray-300 rounded-lg p-3 mb-4">
+          <p class="text-xs font-medium text-gray-500 mb-2">+ スキルを追加</p>
+          <div class="flex items-center gap-2">
+            <select x-model="newSkill.category" class="form-input text-sm w-36 flex-shrink-0">
+              <option value="language">言語</option>
+              <option value="framework">フレームワーク</option>
+              <option value="infra">インフラ・クラウド</option>
+              <option value="domain">ドメイン経験</option>
+            </select>
+            <input type="text" x-model="newSkill.name"
+                   @keydown.enter.prevent="addSkill()"
+                   class="form-input text-sm flex-1" placeholder="スキル名">
+            <select x-model.number="newSkill.level" class="form-input text-sm w-44 flex-shrink-0">
+              <option value="1">★☆☆☆☆ 初学者</option>
+              <option value="2">★★☆☆☆ 入門</option>
+              <option value="3">★★★☆☆ 実務経験あり</option>
+              <option value="4">★★★★☆ 上級</option>
+              <option value="5">★★★★★ エキスパート</option>
+            </select>
+            <button @click="addSkill()"
+                    class="flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white
+                           px-3 py-2 rounded-lg text-sm transition-colors">追加</button>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-gray-100">
+          <button @click="saveProfile()"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium
+                         py-2.5 rounded-lg transition-colors">
+            スキルを保存
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== 資格タブ ===== -->
+      <div x-show="activeTab === 'certs'" class="card">
+        <h2 class="text-base font-semibold text-gray-900 mb-4">資格一覧</h2>
+
+        <div class="space-y-3 mb-4">
+          <template x-for="(cert, idx) in editForm.certifications" :key="idx">
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <div class="flex items-start gap-2">
+                <div class="flex-1 space-y-2">
+                  <input type="text" x-model="cert.name" class="form-input text-sm"
+                         placeholder="資格名">
+                  <div class="grid grid-cols-3 gap-2">
+                    <input type="text" x-model="cert.issuer" class="form-input text-sm"
+                           placeholder="発行機関">
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">取得年月</label>
+                      <input type="month" x-model="cert.acquiredAt" class="form-input text-sm">
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">有効期限</label>
+                      <input type="month" x-model="cert.expiresAt" class="form-input text-sm">
+                    </div>
+                  </div>
+                </div>
+                <button @click="removeCert(idx)"
+                        class="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors p-1 mt-1">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107
+                             1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244
+                             2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456
+                             0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114
+                             1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164
+                             -2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09
+                             2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 資格追加フォーム -->
+        <div class="border border-dashed border-gray-300 rounded-lg p-3 mb-4">
+          <p class="text-xs font-medium text-gray-500 mb-2">+ 資格を追加</p>
+          <div class="space-y-2">
+            <input type="text" x-model="newCert.name" class="form-input text-sm"
+                   placeholder="資格名（例: AWS Solutions Architect Professional）">
+            <div class="grid grid-cols-3 gap-2">
+              <input type="text" x-model="newCert.issuer" class="form-input text-sm"
+                     placeholder="発行機関">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">取得年月</label>
+                <input type="month" x-model="newCert.acquiredAt" class="form-input text-sm">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">有効期限（任意）</label>
+                <input type="month" x-model="newCert.expiresAt" class="form-input text-sm">
+              </div>
+            </div>
+            <button @click="addCert()"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm
+                           font-medium py-2 rounded-lg transition-colors">
+              資格を追加
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-gray-100">
+          <button @click="saveProfile()"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium
+                         py-2.5 rounded-lg transition-colors">
+            資格を保存
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== パーソナリティタブ ===== -->
+      <div x-show="activeTab === 'personality'" class="space-y-6">
+
+        <!-- StrengthsFinder -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-1">StrengthsFinder®</h2>
+          <p class="text-xs text-gray-500 mb-4">TOP 5 資質を選択してください（順番に意味があります）</p>
+          <div class="space-y-3">
+            <template x-for="(_, i) in editForm.personality.strengthsTop5" :key="i">
+              <div class="flex items-center gap-3">
+                <span class="text-xs font-bold text-indigo-400 w-6 text-center"
+                      x-text="`#${i+1}`"></span>
+                <select x-model="editForm.personality.strengthsTop5[i]"
+                        class="form-input text-sm flex-1">
+                  <option value="">（選択してください）</option>
+                  <template x-for="s in allStrengths" :key="s">
+                    <option :value="s" x-text="s"></option>
+                  </template>
+                </select>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- MBTI -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-1">MBTI タイプ</h2>
+          <p class="text-xs text-gray-500 mb-4">16タイプから選択してください</p>
+          <select x-model="editForm.personality.mbtiType" class="form-input text-sm">
+            <option value="">（選択してください）</option>
+            <template x-for="type in mbtiTypes" :key="type.code">
+              <option :value="type.code" x-text="`${type.code} - ${type.name}`"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- 公開設定 -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">公開設定</h2>
+          <div class="space-y-3">
+            <template x-for="opt in visibilityOptions" :key="opt.value">
+              <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50">
+                <input type="radio" :value="opt.value"
+                       x-model="editForm.personality.visibility"
+                       class="accent-indigo-600 mt-0.5">
+                <div>
+                  <p class="text-sm font-medium text-gray-800" x-text="opt.label"></p>
+                  <p class="text-xs text-gray-500" x-text="opt.desc"></p>
+                </div>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <div>
+          <button @click="saveProfile()"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium
+                         py-2.5 rounded-lg transition-colors">
+            パーソナリティを保存
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== 相談設定タブ (senior/admin のみ) ===== -->
+      <div x-show="activeTab === 'consultation'" class="card space-y-6">
+        <h2 class="text-base font-semibold text-gray-900">相談受付設定</h2>
+
+        <!-- ON/OFF トグル -->
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+          <div>
+            <p class="font-medium text-gray-900 text-sm">相談を受け付ける</p>
+            <p class="text-xs text-gray-500 mt-0.5">オンにすると相談窓口一覧に表示されます</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" x-model="editForm.isAcceptingConsultation">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- 相談タグ -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">受け付ける相談分野</label>
+          <div class="flex flex-wrap gap-2 mb-2">
+            <template x-for="tag in editForm.consultationTags" :key="tag">
+              <span class="skill-tag skill-tag-domain flex items-center gap-1 text-sm">
+                <span x-text="tag"></span>
+                <button @click="removeConsultTag(tag)"
+                        class="text-teal-400 hover:text-teal-700 leading-none ml-1">✕</button>
+              </span>
+            </template>
+          </div>
+          <div class="flex gap-2">
+            <input type="text" x-model="newConsultTagInput"
+                   @keydown.enter.prevent="addConsultTag()"
+                   class="form-input flex-1 text-sm"
+                   placeholder="例: TypeScript, キャリア相談, コードレビュー">
+            <button @click="addConsultTag()"
+                    class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700
+                           text-sm rounded-lg transition-colors">追加</button>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-gray-100">
+          <button @click="saveProfile()"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium
+                         py-2.5 rounded-lg transition-colors">
+            相談設定を保存
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+function profileEditApp() {
+  return {
+    user: null,
+    activeTab: 'basic',
+    isDirty: false,
+
+    editForm: {
+      name: '', department: '', grade: '', joinYear: 2020,
+      bio: '', github: '', currentFocus: '',
+      interestTags: [],
+      skills: [],
+      certifications: [],
+      personality: { strengthsTop5: ['','','','',''], mbtiType: '', visibility: 'public' },
+      isAcceptingConsultation: false,
+      consultationTags: [],
+    },
+
+    newTagInput: '',
+    newConsultTagInput: '',
+    newSkill: { category: 'language', name: '', level: 3 },
+    newCert: { name: '', issuer: '', acquiredAt: '', expiresAt: '' },
+
+    allStrengths: [
+      '達成欲','調和性','信念','公平性','慎重さ','規律性','集中力','責任感','回復志向',
+      '活発性','指令性','コミュニケーション','競争性','最上志向','自己確信','自我','社交性',
+      '適応性','親密性','開発志向','共感性','包含','個別化','ポジティブ','関係性',
+      '分析思考','未来志向','着想','知的好奇心','学習欲','戦略性','収集心',
+    ],
+
+    mbtiTypes: [
+      { code: 'INTJ', name: 'アーキテクト型' }, { code: 'INTP', name: '論理学者型' },
+      { code: 'ENTJ', name: '指揮官型' },       { code: 'ENTP', name: '討論者型' },
+      { code: 'INFJ', name: '提唱者型' },       { code: 'INFP', name: '仲介者型' },
+      { code: 'ENFJ', name: '主人公型' },       { code: 'ENFP', name: '広報運動家型' },
+      { code: 'ISTJ', name: '管理者型' },       { code: 'ISFJ', name: '擁護者型' },
+      { code: 'ESTJ', name: '幹部型' },         { code: 'ESFJ', name: '領事館型' },
+      { code: 'ISTP', name: '巨匠型' },         { code: 'ISFP', name: '冒険家型' },
+      { code: 'ESTP', name: '起業家型' },       { code: 'ESFP', name: 'エンターテイナー型' },
+    ],
+
+    visibilityOptions: [
+      { value: 'public',       label: '全員に公開',     desc: 'ログイン中の全メンバーが閲覧できます' },
+      { value: 'role_limited', label: '管理者・シニアのみ', desc: 'adminとseniorロールのメンバーのみ閲覧できます' },
+      { value: 'private',      label: '非公開',          desc: '自分のみ閲覧できます' },
+    ],
+
+    init() {
+      if (!TH.auth.guard()) return;
+      this.user = TH.auth.getCurrentUser();
+      TH.ui.renderSidebar('sidebar', '');
+
+      this.editForm = {
+        name:        this.user.name        || '',
+        department:  this.user.department  || '',
+        grade:       this.user.grade       || '',
+        joinYear:    this.user.joinYear    || 2020,
+        bio:         this.user.bio         || '',
+        github:      this.user.github      || '',
+        currentFocus: this.user.currentFocus || '',
+        interestTags: [...(this.user.interestTags || [])],
+        skills:      (this.user.skills || []).map(s => ({ ...s })),
+        certifications: (this.user.certifications || []).map(c => ({ ...c })),
+        personality: {
+          strengthsTop5: [
+            ...((this.user.personality?.strengthsTop5 || []).concat(['','','','','']).slice(0, 5))
+          ],
+          mbtiType:   this.user.personality?.mbtiType   || '',
+          visibility: this.user.personality?.visibility || 'public',
+        },
+        isAcceptingConsultation: this.user.isAcceptingConsultation || false,
+        consultationTags: [...(this.user.consultationTags || [])],
+      };
+
+      // 変更検知
+      this.$watch('editForm', () => { this.isDirty = true; }, { deep: true });
+    },
+
+    saveProfile() {
+      if (!this.editForm.name.trim()) {
+        TH.ui.toast('氏名は必須です', 'error'); return;
+      }
+      if (!this.editForm.department.trim()) {
+        TH.ui.toast('部署は必須です', 'error'); return;
+      }
+
+      const updated = {
+        ...this.user,
+        name:         this.editForm.name.trim(),
+        department:   this.editForm.department.trim(),
+        grade:        this.editForm.grade.trim(),
+        position:     this.editForm.grade.trim(), // positionも更新
+        joinYear:     Number(this.editForm.joinYear),
+        bio:          this.editForm.bio,
+        github:       this.editForm.github.trim(),
+        currentFocus: this.editForm.currentFocus,
+        interestTags: this.editForm.interestTags,
+        skills:       this.editForm.skills.filter(s => s.name.trim()),
+        certifications: this.editForm.certifications.filter(c => c.name.trim()),
+        personality:  {
+          strengthsTop5: this.editForm.personality.strengthsTop5,
+          mbtiType:      this.editForm.personality.mbtiType,
+          visibility:    this.editForm.personality.visibility,
+        },
+        isAcceptingConsultation: this.editForm.isAcceptingConsultation,
+        consultationTags: this.editForm.consultationTags,
+      };
+
+      TH.data.saveUser(updated);
+      this.isDirty = false;
+      TH.ui.toast('プロフィールを保存しました', 'success');
+
+      setTimeout(() => {
+        localStorage.setItem('th_viewing_user_id', this.user.id);
+        window.location.href = 'profile-view.html';
+      }, 600);
+    },
+
+    // スキル操作
+    addSkill() {
+      if (!this.newSkill.name.trim()) {
+        TH.ui.toast('スキル名を入力してください', 'error'); return;
+      }
+      this.editForm.skills.push({
+        id: `skill_${Date.now()}`,
+        category: this.newSkill.category,
+        name: this.newSkill.name.trim(),
+        level: Number(this.newSkill.level),
+      });
+      this.newSkill = { category: 'language', name: '', level: 3 };
+    },
+
+    removeSkill(idx) {
+      this.editForm.skills.splice(idx, 1);
+    },
+
+    // 資格操作
+    addCert() {
+      if (!this.newCert.name.trim()) {
+        TH.ui.toast('資格名を入力してください', 'error'); return;
+      }
+      this.editForm.certifications.push({
+        id: `cert_${Date.now()}`,
+        name:        this.newCert.name.trim(),
+        issuer:      this.newCert.issuer.trim(),
+        acquiredAt:  this.newCert.acquiredAt,
+        expiresAt:   this.newCert.expiresAt,
+      });
+      this.newCert = { name: '', issuer: '', acquiredAt: '', expiresAt: '' };
+    },
+
+    removeCert(idx) {
+      this.editForm.certifications.splice(idx, 1);
+    },
+
+    // タグ操作
+    addInterestTag() {
+      const t = this.newTagInput.trim();
+      if (t && !this.editForm.interestTags.includes(t)) {
+        this.editForm.interestTags.push(t);
+      }
+      this.newTagInput = '';
+    },
+
+    removeInterestTag(tag) {
+      this.editForm.interestTags = this.editForm.interestTags.filter(t => t !== tag);
+    },
+
+    addConsultTag() {
+      const t = this.newConsultTagInput.trim();
+      if (t && !this.editForm.consultationTags.includes(t)) {
+        this.editForm.consultationTags.push(t);
+      }
+      this.newConsultTagInput = '';
+    },
+
+    removeConsultTag(tag) {
+      this.editForm.consultationTags = this.editForm.consultationTags.filter(t => t !== tag);
+    },
+
+    goBack() {
+      if (this.isDirty) {
+        if (!confirm('保存されていない変更があります。このページを離れますか？')) return;
+      }
+      localStorage.setItem('th_viewing_user_id', this.user.id);
+      window.location.href = 'profile-view.html';
+    },
+  }
+}
+</script>
+</body>
+</html>

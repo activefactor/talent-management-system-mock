@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理者ダッシュボード - TalentHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/common.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body x-data="adminApp()" x-init="init()" x-cloak>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+    <div class="max-w-7xl mx-auto fade-in">
+
+      <!-- ページタイトル -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">管理者ダッシュボード 🛡️</h1>
+          <p class="text-sm text-gray-500 mt-1">組織全体のスキル・学習状況を確認できます</p>
+        </div>
+        <span class="badge-chip badge-amber text-sm">Admin Only</span>
+      </div>
+
+      <!-- サマリーカード 4枚 -->
+      <div class="grid grid-cols-2 gap-4 mb-8 lg:grid-cols-4">
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">👥</span>
+            <span class="text-xs text-gray-500 font-medium">総ユーザー数</span>
+          </div>
+          <p class="text-3xl font-bold text-indigo-600">
+            <span x-text="totalStats.userCount"></span>
+            <span class="text-base font-medium text-gray-400 ml-1">名</span>
+          </p>
+        </div>
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">🛠</span>
+            <span class="text-xs text-gray-500 font-medium">総スキル登録数</span>
+          </div>
+          <p class="text-3xl font-bold text-blue-600">
+            <span x-text="totalStats.skillCount"></span>
+            <span class="text-base font-medium text-gray-400 ml-1">件</span>
+          </p>
+        </div>
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">📝</span>
+            <span class="text-xs text-gray-500 font-medium">今月のログ記録数</span>
+          </div>
+          <p class="text-3xl font-bold text-emerald-600">
+            <span x-text="totalStats.monthLogCount"></span>
+            <span class="text-base font-medium text-gray-400 ml-1">件</span>
+          </p>
+        </div>
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">🏅</span>
+            <span class="text-xs text-gray-500 font-medium">総バッジ取得数</span>
+          </div>
+          <p class="text-3xl font-bold text-amber-600">
+            <span x-text="totalStats.totalBadgeCount"></span>
+            <span class="text-base font-medium text-gray-400 ml-1">個</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- スキルマップ -->
+      <div class="card mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-semibold text-gray-900">スキルマップ</h2>
+          <span class="text-xs text-gray-500">
+            <span x-text="skillMapData.length"></span> スキル ×
+            <span x-text="allUsers.length"></span> メンバー
+          </span>
+        </div>
+
+        <!-- カテゴリタブ -->
+        <div class="tab-bar mb-4">
+          <button class="tab-btn" :class="skillMapTab === 'language' && 'active'"
+                  @click="buildSkillMap('language')">言語</button>
+          <button class="tab-btn" :class="skillMapTab === 'framework' && 'active'"
+                  @click="buildSkillMap('framework')">フレームワーク</button>
+          <button class="tab-btn" :class="skillMapTab === 'infra' && 'active'"
+                  @click="buildSkillMap('infra')">インフラ・クラウド</button>
+          <button class="tab-btn" :class="skillMapTab === 'domain' && 'active'"
+                  @click="buildSkillMap('domain')">ドメイン経験</button>
+          <button class="tab-btn" :class="skillMapTab === 'all' && 'active'"
+                  @click="buildSkillMap('all')">全て</button>
+        </div>
+
+        <!-- テーブル -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full skill-map-table text-sm border-collapse">
+            <thead>
+              <tr>
+                <th class="sticky left-0 z-10 bg-gray-50 text-left px-3 py-2 text-xs
+                           text-gray-500 font-semibold whitespace-nowrap min-w-[120px]">
+                  スキル
+                </th>
+                <template x-for="u in allUsers" :key="u.id">
+                  <th class="px-2 py-2 text-center min-w-[56px]">
+                    <button @click="goToProfile(u.id)"
+                            class="flex flex-col items-center gap-1 hover:opacity-70
+                                   transition-opacity cursor-pointer">
+                      <div class="avatar w-7 h-7 text-xs"
+                           :style="`background: ${u.avatarColor}`"
+                           x-text="u.avatarInitial"></div>
+                      <span class="text-xs text-gray-600 font-medium"
+                            x-text="u.name.split(' ')[0]"></span>
+                    </button>
+                  </th>
+                </template>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="row in skillMapData" :key="row.skillName">
+                <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td class="sticky left-0 z-10 bg-white hover:bg-gray-50 px-3 py-2
+                             font-medium text-gray-800 text-xs whitespace-nowrap">
+                    <span x-text="row.skillName"></span>
+                  </td>
+                  <template x-for="(level, idx) in row.levels" :key="idx">
+                    <td class="px-2 py-2 text-center">
+                      <template x-if="level > 0">
+                        <span class="inline-flex items-center justify-center w-7 h-7
+                                     rounded-lg text-xs font-bold"
+                              :class="skillCellClass(level)"
+                              x-text="level"
+                              :title="`レベル ${level}/5`"></span>
+                      </template>
+                      <template x-if="level === 0">
+                        <span class="text-gray-200 text-sm">–</span>
+                      </template>
+                    </td>
+                  </template>
+                </tr>
+              </template>
+              <tr x-show="skillMapData.length === 0">
+                <td :colspan="allUsers.length + 1"
+                    class="text-center py-8 text-gray-400 text-sm">
+                  このカテゴリのスキルデータがありません
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- レベル凡例 -->
+        <div class="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
+          <span>凡例:</span>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-blue-50 text-blue-600 font-bold">1</span>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-blue-50 text-blue-700 font-bold">2</span>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-blue-100 text-blue-800 font-bold">3</span>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-indigo-100 text-indigo-700 font-bold">4</span>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-indigo-200 text-indigo-800 font-bold">5</span>
+          <span class="ml-2 text-gray-400">1=初学者 / 3=実務経験あり / 5=エキスパート</span>
+        </div>
+      </div>
+
+      <!-- 2カラム: スキル保有人数グラフ + 最近のアクティビティ -->
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        <!-- スキル別保有人数 横棒グラフ -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">スキル別保有人数 Top 15</h2>
+          <canvas id="skillCountChart"></canvas>
+        </div>
+
+        <!-- 最近のアクティビティ -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">最近のアクティビティ</h2>
+
+          <div class="space-y-3">
+            <template x-for="(item, idx) in recentActivity" :key="idx">
+              <div class="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
+                <!-- アバター -->
+                <div class="avatar w-8 h-8 text-xs flex-shrink-0 cursor-pointer"
+                     :style="`background: ${item.user?.avatarColor}`"
+                     x-text="item.user?.avatarInitial"
+                     @click="goToProfile(item.user?.id)"></div>
+
+                <!-- 内容 -->
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm text-gray-800">
+                    <button @click="goToProfile(item.user?.id)"
+                            class="font-medium text-indigo-600 hover:underline"
+                            x-text="item.user?.name"></button>
+                    が
+                    <span class="text-gray-600">「<span x-text="item.log.title" class="font-medium"></span>」</span>
+                    を記録
+                  </p>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span x-text="categoryIcon(item.log.category)" class="text-sm"></span>
+                    <span class="text-xs text-gray-400"
+                          x-text="formatDate(item.log.loggedAt)"></span>
+                    <span class="text-xs text-gray-400">·</span>
+                    <span class="text-xs text-gray-400"
+                          x-text="formatDuration(item.log.durationMinutes)"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <div x-show="recentActivity.length === 0"
+                 class="flex flex-col items-center py-8 text-gray-400">
+              <p class="text-3xl mb-2">📭</p>
+              <p class="text-sm">直近7日間のアクティビティはありません</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- メンバー一覧テーブル -->
+      <div class="card mt-6">
+        <h2 class="text-base font-semibold text-gray-900 mb-4">メンバー一覧</h2>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-200">
+                <th class="text-left py-2 px-3 text-xs font-semibold text-gray-500">メンバー</th>
+                <th class="text-left py-2 px-3 text-xs font-semibold text-gray-500">部署・役職</th>
+                <th class="text-center py-2 px-3 text-xs font-semibold text-gray-500">ロール</th>
+                <th class="text-center py-2 px-3 text-xs font-semibold text-gray-500">スキル数</th>
+                <th class="text-center py-2 px-3 text-xs font-semibold text-gray-500">累計時間</th>
+                <th class="text-center py-2 px-3 text-xs font-semibold text-gray-500">バッジ数</th>
+                <th class="text-center py-2 px-3 text-xs font-semibold text-gray-500">相談</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="u in allUsers" :key="u.id">
+                <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                    @click="goToProfile(u.id)">
+                  <td class="py-3 px-3">
+                    <div class="flex items-center gap-2">
+                      <div class="avatar w-8 h-8 text-xs flex-shrink-0"
+                           :style="`background: ${u.avatarColor}`"
+                           x-text="u.avatarInitial"></div>
+                      <span class="font-medium text-gray-900 text-sm" x-text="u.name"></span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-3">
+                    <p class="text-xs text-gray-700" x-text="u.department"></p>
+                    <p class="text-xs text-gray-500" x-text="u.position"></p>
+                  </td>
+                  <td class="py-3 px-3 text-center">
+                    <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                          :class="`role-badge-${u.role}`"
+                          x-text="roleLabel(u.role)"></span>
+                  </td>
+                  <td class="py-3 px-3 text-center">
+                    <span class="text-sm font-medium text-gray-800"
+                          x-text="u.skills?.length || 0"></span>
+                  </td>
+                  <td class="py-3 px-3 text-center">
+                    <span class="text-sm font-medium text-gray-800"
+                          x-text="getTotalHours(u.id)"></span>
+                  </td>
+                  <td class="py-3 px-3 text-center">
+                    <span class="text-sm font-medium text-gray-800"
+                          x-text="getBadgeCount(u.id)"></span>
+                  </td>
+                  <td class="py-3 px-3 text-center">
+                    <span x-show="u.isAcceptingConsultation"
+                          class="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">受付中</span>
+                    <span x-show="!u.isAcceptingConsultation"
+                          class="text-xs text-gray-300">–</span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+function adminApp() {
+  return {
+    user: null,
+    allUsers: [],
+    skillMapTab: 'language',
+    skillMapData: [],
+    totalStats: {
+      userCount: 0, skillCount: 0, monthLogCount: 0, totalBadgeCount: 0,
+    },
+    recentActivity: [],
+
+    init() {
+      if (!TH.auth.guardAdmin()) return;
+      this.user = TH.auth.getCurrentUser();
+      TH.ui.renderSidebar('sidebar', 'admin');
+      this.allUsers = TH.data.getUsers();
+      this.calcStats();
+      this.buildSkillMap('language');
+      this.recentActivity = this.getRecentActivity();
+      this.$nextTick(() => this.renderSkillCountChart());
+    },
+
+    calcStats() {
+      const users = this.allUsers;
+      this.totalStats = {
+        userCount:       users.length,
+        skillCount:      users.reduce((s, u) => s + (u.skills?.length || 0), 0),
+        monthLogCount:   this._countMonthLogs(),
+        totalBadgeCount: users.reduce((s, u) => s + TH.data.getEarnedBadges(u.id).length, 0),
+      };
+    },
+
+    buildSkillMap(cat) {
+      this.skillMapTab = cat;
+      const filter = cat === 'all' ? '' : cat;
+      const users = this.allUsers;
+
+      const allSkillNames = [...new Set(
+        users.flatMap(u => (u.skills || [])
+          .filter(s => !filter || s.category === filter)
+          .map(s => s.name)
+        )
+      )].sort();
+
+      this.skillMapData = allSkillNames.map(skillName => ({
+        skillName,
+        levels: users.map(u => {
+          const s = (u.skills || []).find(sk => sk.name === skillName);
+          return s ? s.level : 0;
+        }),
+      }));
+    },
+
+    getRecentActivity() {
+      const users = this.allUsers;
+      const userMap = Object.fromEntries(users.map(u => [u.id, u]));
+      const allLogs = TH.data.getLogs();
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const cutoff = sevenDaysAgo.toISOString().split('T')[0];
+
+      return allLogs
+        .filter(l => l.loggedAt >= cutoff)
+        .sort((a, b) => b.loggedAt.localeCompare(a.loggedAt))
+        .slice(0, 10)
+        .map(l => ({ user: userMap[l.userId], log: l }))
+        .filter(item => item.user);
+    },
+
+    renderSkillCountChart() {
+      const counts = {};
+      this.allUsers.forEach(u => {
+        (u.skills || []).forEach(s => {
+          counts[s.name] = (counts[s.name] || 0) + 1;
+        });
+      });
+
+      const sorted = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15);
+
+      const labels = sorted.map(([name]) => name);
+      const data   = sorted.map(([, cnt]) => cnt);
+
+      const ctx = document.getElementById('skillCountChart');
+      if (!ctx) return;
+      if (window._skillCountChart) window._skillCountChart.destroy();
+      window._skillCountChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: '#818CF8',
+            borderRadius: 4,
+            borderSkipped: false,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label(ctx) { return ` ${ctx.parsed.x}名`; }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { stepSize: 1, font: { size: 11 } },
+              max: Math.max(...data) + 1,
+              grid: { color: 'rgba(0,0,0,0.04)' },
+            },
+            y: {
+              ticks: { font: { size: 11 } },
+              grid: { display: false },
+            },
+          },
+        },
+      });
+    },
+
+    _countMonthLogs() {
+      const now = new Date();
+      const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      return TH.data.getLogs().filter(l => l.loggedAt.startsWith(ym)).length;
+    },
+
+    skillCellClass(level) {
+      const map = {
+        1: 'bg-blue-50 text-blue-600',
+        2: 'bg-blue-50 text-blue-700',
+        3: 'bg-blue-100 text-blue-800',
+        4: 'bg-indigo-100 text-indigo-700',
+        5: 'bg-indigo-200 text-indigo-800',
+      };
+      return map[level] || '';
+    },
+
+    getTotalHours(userId) {
+      return TH.fmt.totalHours(TH.data.getTotalMinutes(userId));
+    },
+
+    getBadgeCount(userId) {
+      return TH.data.getEarnedBadges(userId).length;
+    },
+
+    roleLabel(role) {
+      return TH.fmt.roleLabel(role);
+    },
+
+    categoryIcon(cat) {
+      const icons = {
+        reading: '📖', study: '📜', development: '💻',
+        meetup: '🎓', ojt: '🏢', other: '📌',
+      };
+      return icons[cat] || '📝';
+    },
+
+    formatDate(ds) {
+      if (!ds) return '';
+      const [y, m, d] = ds.split('-');
+      return `${y}/${m}/${d}`;
+    },
+
+    formatDuration(mins) {
+      if (!mins) return '';
+      if (mins < 60) return `${mins}分`;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return m > 0 ? `${h}時間${m}分` : `${h}時間`;
+    },
+
+    goToProfile(userId) {
+      if (userId) TH.nav.go('profile-view', userId);
+    },
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学習ログ - TalentHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/common.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body x-data="learningLogApp()" x-init="init()" x-cloak>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+    <div class="max-w-6xl mx-auto fade-in">
+
+      <!-- ページタイトル -->
+      <h1 class="text-2xl font-bold text-gray-900 mb-6">学習ログ 📖</h1>
+
+      <!-- サマリーカード -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xl">📚</span>
+            <span class="text-xs text-gray-500 font-medium">累計学習時間</span>
+          </div>
+          <p class="text-2xl font-bold text-indigo-600" x-text="TH.fmt.totalHours(totalMinutes)"></p>
+        </div>
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xl">📅</span>
+            <span class="text-xs text-gray-500 font-medium">今月の学習時間</span>
+          </div>
+          <p class="text-2xl font-bold text-emerald-600" x-text="TH.fmt.totalHours(thisMonthMinutes)"></p>
+        </div>
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xl">🔥</span>
+            <span class="text-xs text-gray-500 font-medium">継続ストリーク</span>
+          </div>
+          <p class="text-2xl font-bold text-amber-600">
+            <span x-text="streak"></span>
+            <span class="text-base font-medium text-gray-400 ml-1">日</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- 活動ヒートマップ -->
+      <div class="card mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-semibold text-gray-900">活動カレンダー</h2>
+          <div class="flex items-center gap-1.5 text-xs text-gray-400">
+            <span>少</span>
+            <div class="heatmap-cell hm-0"></div>
+            <div class="heatmap-cell hm-1"></div>
+            <div class="heatmap-cell hm-2"></div>
+            <div class="heatmap-cell hm-3"></div>
+            <div class="heatmap-cell hm-4"></div>
+            <span>多</span>
+          </div>
+        </div>
+        <div class="heatmap-wrapper">
+          <div id="heatmap"></div>
+        </div>
+      </div>
+
+      <!-- 2カラム: 新規記録 + カテゴリ内訳 -->
+      <div class="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
+
+        <!-- 新規記録フォーム -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">新規記録 ✏️</h2>
+
+          <!-- カテゴリ選択 -->
+          <div class="grid grid-cols-3 gap-2 mb-4">
+            <template x-for="cat in categories" :key="cat.value">
+              <button @click="logForm.category = cat.value"
+                      :class="logForm.category === cat.value
+                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'"
+                      class="border-2 rounded-xl py-2.5 px-2 flex flex-col items-center
+                             gap-1 transition-colors cursor-pointer">
+                <span class="text-2xl" x-text="cat.icon"></span>
+                <span class="text-xs font-medium" x-text="cat.label"></span>
+              </button>
+            </template>
+          </div>
+
+          <!-- タイトル -->
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-gray-600 mb-1">タイトル <span class="text-red-400">*</span></label>
+            <input type="text" x-model="logForm.title"
+                   @keydown.enter.prevent
+                   placeholder="何を学んだか一言で（例: Rust入門書を読んだ）"
+                   class="form-input text-sm">
+          </div>
+
+          <!-- 日付 + 時間 -->
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">活動日</label>
+              <input type="date" x-model="logForm.loggedAt" class="form-input text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">活動時間</label>
+              <select x-model.number="logForm.durationMinutes" class="form-input text-sm">
+                <option value="15">15分</option>
+                <option value="30">30分</option>
+                <option value="45">45分</option>
+                <option value="60">60分</option>
+                <option value="90">90分</option>
+                <option value="120">120分</option>
+                <option value="180">180分</option>
+                <option value="240">240分</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- メモ -->
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-gray-600 mb-1">メモ（任意）</label>
+            <textarea x-model="logForm.memo" rows="3" maxlength="300"
+                      placeholder="学んだ内容や気づきをメモ..."
+                      class="form-input text-sm resize-none"></textarea>
+            <p class="text-xs text-gray-400 mt-0.5 text-right">
+              <span x-text="logForm.memo.length"></span>/300
+            </p>
+          </div>
+
+          <!-- タグ -->
+          <div class="mb-4">
+            <label class="block text-xs font-medium text-gray-600 mb-1">タグ（任意）</label>
+            <div class="flex flex-wrap gap-1.5 mb-2" x-show="logForm.tags.length > 0">
+              <template x-for="tag in logForm.tags" :key="tag">
+                <span class="skill-tag skill-tag-interest flex items-center gap-1 text-xs">
+                  <span x-text="tag"></span>
+                  <button @click="removeTag(tag)"
+                          class="text-blue-400 hover:text-blue-700 leading-none">✕</button>
+                </span>
+              </template>
+            </div>
+            <div class="flex gap-2">
+              <input type="text" x-model="newTag"
+                     @keydown.enter.prevent="addTag()"
+                     placeholder="タグを追加（Enter）"
+                     class="form-input text-sm flex-1">
+              <button @click="addTag()"
+                      class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700
+                             text-sm rounded-lg transition-colors">追加</button>
+            </div>
+          </div>
+
+          <!-- 記録ボタン -->
+          <button @click="addLog()"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium
+                         py-2.5 rounded-lg transition-colors">
+            記録する
+          </button>
+        </div>
+
+        <!-- カテゴリ別棒グラフ -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">カテゴリ別内訳（過去6ヶ月）</h2>
+          <canvas id="barChart" height="280"></canvas>
+        </div>
+      </div>
+
+      <!-- ログ履歴 -->
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-semibold text-gray-900">記録履歴</h2>
+          <span class="text-sm text-gray-500">
+            <span class="font-medium text-gray-900" x-text="filteredLogs.length"></span>件
+          </span>
+        </div>
+
+        <!-- フィルターバー -->
+        <div class="flex flex-wrap gap-3 mb-4">
+          <select x-model="filterCategory"
+                  class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <option value="">全カテゴリ</option>
+            <template x-for="cat in categories" :key="cat.value">
+              <option :value="cat.value" x-text="cat.label"></option>
+            </template>
+          </select>
+
+          <select x-model="filterPeriod"
+                  class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <option value="all">全期間</option>
+            <option value="this_month">今月</option>
+            <option value="last_month">先月</option>
+            <option value="3months">過去3ヶ月</option>
+          </select>
+        </div>
+
+        <!-- ログリスト -->
+        <div class="space-y-3">
+          <template x-for="log in filteredLogs" :key="log.id">
+            <div class="card p-0 overflow-hidden">
+              <div class="flex items-stretch">
+                <!-- カテゴリカラーボーダー -->
+                <div class="w-1 flex-shrink-0 rounded-l-xl"
+                     :style="`background-color: ${getCategoryColor(log.category)}`"></div>
+
+                <div class="flex-1 p-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                      <!-- タイトル行 -->
+                      <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <span x-text="categoryIcon(log.category)" class="text-lg flex-shrink-0"></span>
+                        <span class="font-medium text-gray-900 text-sm" x-text="log.title"></span>
+                      </div>
+
+                      <!-- 日時・時間 -->
+                      <div class="flex items-center gap-3 text-xs text-gray-500 mb-2">
+                        <span x-text="formatDate(log.loggedAt)"></span>
+                        <span>·</span>
+                        <span x-text="formatDuration(log.durationMinutes)"></span>
+                        <span class="skill-tag text-xs px-1.5 py-0.5"
+                              :class="`skill-tag-${getCategoryTagClass(log.category)}`"
+                              x-text="categoryLabel(log.category)"></span>
+                      </div>
+
+                      <!-- タグ -->
+                      <div class="flex flex-wrap gap-1 mb-1" x-show="log.tags && log.tags.length > 0">
+                        <template x-for="tag in log.tags" :key="tag">
+                          <span class="skill-tag skill-tag-interest text-xs" x-text="tag"></span>
+                        </template>
+                      </div>
+
+                      <!-- メモ -->
+                      <p class="text-xs text-gray-500 line-clamp-2"
+                         x-show="log.memo" x-text="log.memo"></p>
+                    </div>
+
+                    <!-- 削除ボタン -->
+                    <button @click="deleteLog(log.id)"
+                            class="flex-shrink-0 text-gray-300 hover:text-red-500
+                                   transition-colors p-1 rounded">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                           stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107
+                                 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244
+                                 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456
+                                 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114
+                                 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18
+                                 -.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037
+                                 -2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- 0件 -->
+          <div x-show="filteredLogs.length === 0"
+               class="flex flex-col items-center justify-center py-16 text-gray-400">
+            <p class="text-5xl mb-3">📭</p>
+            <p class="text-sm font-medium text-gray-500">記録がありません</p>
+            <p class="text-xs text-gray-400 mt-1">フィルターを変更するか、新しい記録を追加してください</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+function learningLogApp() {
+  return {
+    user: null,
+    allLogs: [],
+    filterCategory: '',
+    filterPeriod: 'all',
+    newTag: '',
+
+    categories: [
+      { value: 'reading',      label: '読書',    icon: '📖', color: '#6366F1' },
+      { value: 'study',        label: '資格勉強', icon: '📜', color: '#8B5CF6' },
+      { value: 'development',  label: '個人開発', icon: '💻', color: '#EC4899' },
+      { value: 'meetup',       label: '勉強会',   icon: '🎓', color: '#F59E0B' },
+      { value: 'ojt',          label: 'OJT',     icon: '🏢', color: '#10B981' },
+      { value: 'other',        label: 'その他',   icon: '📌', color: '#6B7280' },
+    ],
+
+    logForm: {
+      category: 'reading',
+      title: '',
+      loggedAt: new Date().toISOString().split('T')[0],
+      durationMinutes: 60,
+      memo: '',
+      tags: [],
+    },
+
+    get filteredLogs() {
+      const now = new Date();
+      return this.allLogs
+        .filter(l => {
+          if (this.filterCategory && l.category !== this.filterCategory) return false;
+          if (this.filterPeriod === 'all') return true;
+
+          const d = new Date(l.loggedAt);
+          const y = d.getFullYear(), m = d.getMonth();
+          const ny = now.getFullYear(), nm = now.getMonth();
+
+          if (this.filterPeriod === 'this_month') {
+            return y === ny && m === nm;
+          }
+          if (this.filterPeriod === 'last_month') {
+            const lm = nm === 0 ? 11 : nm - 1;
+            const ly = nm === 0 ? ny - 1 : ny;
+            return y === ly && m === lm;
+          }
+          if (this.filterPeriod === '3months') {
+            const cutoff = new Date(now);
+            cutoff.setMonth(cutoff.getMonth() - 3);
+            return d >= cutoff;
+          }
+          return true;
+        })
+        .sort((a, b) => b.loggedAt.localeCompare(a.loggedAt));
+    },
+
+    get totalMinutes() {
+      return TH.data.getTotalMinutes(this.user?.id);
+    },
+
+    get streak() {
+      return TH.data.getStreak(this.user?.id);
+    },
+
+    get thisMonthMinutes() {
+      const now = new Date();
+      const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      return this.allLogs
+        .filter(l => l.loggedAt.startsWith(ym))
+        .reduce((s, l) => s + l.durationMinutes, 0);
+    },
+
+    init() {
+      if (!TH.auth.guard()) return;
+      this.user = TH.auth.getCurrentUser();
+      TH.ui.renderSidebar('sidebar', 'learning-log');
+      this.allLogs = TH.data.getLogs(this.user.id);
+      this.$nextTick(() => {
+        TH.ui.renderHeatmap('heatmap', this.user.id, 26);
+        this.renderBarChart();
+      });
+    },
+
+    addLog() {
+      if (!this.logForm.title.trim()) {
+        TH.ui.toast('タイトルを入力してください', 'error');
+        return;
+      }
+      TH.data.addLog({
+        id: `log_${Date.now()}`,
+        userId: this.user.id,
+        category:        this.logForm.category,
+        title:           this.logForm.title.trim(),
+        loggedAt:        this.logForm.loggedAt,
+        durationMinutes: Number(this.logForm.durationMinutes),
+        memo:            this.logForm.memo,
+        tags:            [...this.logForm.tags],
+      });
+      this.allLogs = TH.data.getLogs(this.user.id);
+      this.logForm.title = '';
+      this.logForm.memo  = '';
+      this.logForm.tags  = [];
+      this.logForm.loggedAt = new Date().toISOString().split('T')[0];
+      TH.ui.toast('記録しました！', 'success');
+      TH.ui.renderHeatmap('heatmap', this.user.id, 26);
+      this.$nextTick(() => this.renderBarChart());
+    },
+
+    deleteLog(logId) {
+      if (!confirm('このログを削除しますか？')) return;
+      TH.data.deleteLog(logId);
+      this.allLogs = TH.data.getLogs(this.user.id);
+      TH.ui.toast('削除しました', 'info');
+      TH.ui.renderHeatmap('heatmap', this.user.id, 26);
+      this.$nextTick(() => this.renderBarChart());
+    },
+
+    addTag() {
+      const t = this.newTag.trim();
+      if (t && !this.logForm.tags.includes(t)) this.logForm.tags.push(t);
+      this.newTag = '';
+    },
+
+    removeTag(tag) {
+      this.logForm.tags = this.logForm.tags.filter(t => t !== tag);
+    },
+
+    renderBarChart() {
+      // 過去6ヶ月のラベル生成
+      const months = [];
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      }
+
+      const catValues = this.categories.map(c => c.value);
+
+      const datasets = this.categories.map(cat => ({
+        label: cat.label,
+        data: months.map(ym => {
+          const mins = this.allLogs
+            .filter(l => l.category === cat.value && l.loggedAt.startsWith(ym))
+            .reduce((s, l) => s + l.durationMinutes, 0);
+          return Math.round((mins / 60) * 10) / 10; // 時間（小数1桁）
+        }),
+        backgroundColor: cat.color,
+        borderRadius: 3,
+        borderSkipped: false,
+      }));
+
+      const ctx = document.getElementById('barChart');
+      if (!ctx) return;
+      if (window._barChart) window._barChart.destroy();
+      window._barChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: months.map(m => `${parseInt(m.split('-')[1])}月`),
+          datasets,
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: {
+              stacked: true,
+              title: { display: true, text: '時間', font: { size: 11 } },
+              ticks: { font: { size: 11 } },
+            },
+          },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { font: { size: 11 }, boxWidth: 12, padding: 8 },
+            },
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  return ` ${ctx.dataset.label}: ${ctx.parsed.y}時間`;
+                }
+              }
+            }
+          },
+        }
+      });
+    },
+
+    getCategoryColor(cat) {
+      return this.categories.find(c => c.value === cat)?.color || '#6B7280';
+    },
+
+    getCategoryTagClass(cat) {
+      const map = {
+        reading: 'language', study: 'framework',
+        development: 'infra', meetup: 'domain',
+        ojt: 'domain', other: 'interest',
+      };
+      return map[cat] || 'interest';
+    },
+
+    categoryIcon(cat) {
+      return this.categories.find(c => c.value === cat)?.icon || '📝';
+    },
+
+    categoryLabel(cat) {
+      return this.categories.find(c => c.value === cat)?.label
+          || TH.fmt.categoryLabel(cat);
+    },
+
+    formatDate(ds) {
+      if (!ds) return '';
+      const [y, m, d] = ds.split('-');
+      return `${y}/${m}/${d}`;
+    },
+
+    formatDuration(mins) {
+      if (mins < 60) return `${mins}分`;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return m > 0 ? `${h}時間${m}分` : `${h}時間`;
+    },
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>プロフィール - TalentHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/common.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body x-data="profileViewApp()" x-init="init()" x-cloak>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+    <div class="max-w-4xl mx-auto fade-in" x-show="targetUser">
+
+      <!-- 戻るボタン -->
+      <button @click="goBack()"
+              class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800
+                     mb-4 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+        </svg>
+        メンバー一覧に戻る
+      </button>
+
+      <!-- プロフィールヘッダー -->
+      <div class="card mb-6">
+        <div class="flex flex-col sm:flex-row gap-5">
+
+          <!-- アバター -->
+          <div class="avatar w-20 h-20 text-2xl flex-shrink-0"
+               :style="`background: ${targetUser?.avatarColor}`"
+               x-text="targetUser?.avatarInitial"></div>
+
+          <!-- 基本情報 -->
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-start gap-3 mb-2">
+              <h1 class="text-2xl font-bold text-gray-900" x-text="targetUser?.name"></h1>
+              <span class="text-xs px-2 py-1 rounded-full font-medium mt-0.5"
+                    :class="`role-badge-${targetUser?.role}`"
+                    x-text="roleLabel(targetUser?.role)"></span>
+              <span x-show="targetUser?.isAcceptingConsultation"
+                    class="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700
+                           px-2 py-1 rounded-full font-medium mt-0.5">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0
+                       01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866
+                       3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"
+                       clip-rule="evenodd"/>
+                </svg>
+                相談受付中
+              </span>
+            </div>
+
+            <p class="text-sm text-gray-500 mb-3"
+               x-text="`${targetUser?.department} · ${targetUser?.position}`"></p>
+
+            <div class="flex flex-wrap gap-4 text-sm text-gray-500 mb-3">
+              <span x-show="targetUser?.joinYear">
+                🗓 <span x-text="`${targetUser?.joinYear}年入社`"></span>
+              </span>
+              <span x-show="targetUser?.github" class="flex items-center gap-1">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                </svg>
+                <span x-text="`@${targetUser?.github}`"></span>
+              </span>
+            </div>
+
+            <p class="text-sm text-gray-700 mb-2" x-show="targetUser?.bio" x-text="targetUser?.bio"></p>
+            <p class="text-sm text-gray-600" x-show="targetUser?.currentFocus">
+              <span class="font-medium text-indigo-600">取り組み中：</span>
+              <span x-text="targetUser?.currentFocus"></span>
+            </p>
+
+            <!-- インタレストタグ -->
+            <div class="flex flex-wrap gap-1.5 mt-3" x-show="targetUser?.interestTags?.length > 0">
+              <template x-for="tag in (targetUser?.interestTags || [])" :key="tag">
+                <span class="skill-tag skill-tag-interest text-xs" x-text="tag"></span>
+              </template>
+            </div>
+          </div>
+
+          <!-- 編集ボタン（自分のみ） -->
+          <div x-show="isOwnProfile" class="flex-shrink-0">
+            <button @click="goToEdit()"
+                    class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700
+                           text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582
+                         16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0
+                         011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25
+                         2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25
+                         2.25 0 015.25 6H10"/>
+              </svg>
+              編集
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- タブバー -->
+      <div class="tab-bar mb-6">
+        <button class="tab-btn" :class="activeTab === 'skills' && 'active'" @click="activeTab = 'skills'">
+          スキル
+        </button>
+        <button class="tab-btn" :class="activeTab === 'certs' && 'active'" @click="activeTab = 'certs'">
+          資格
+        </button>
+        <button class="tab-btn" :class="activeTab === 'personality' && 'active'"
+                @click="switchToPersonality()">
+          パーソナリティ
+        </button>
+        <button class="tab-btn" :class="activeTab === 'activity' && 'active'"
+                @click="switchToActivity()">
+          活動
+        </button>
+      </div>
+
+      <!-- ===== スキルタブ ===== -->
+      <div x-show="activeTab === 'skills'">
+        <div class="card">
+          <template x-if="(targetUser?.skills || []).length === 0">
+            <div class="text-center py-12 text-gray-400">
+              <p class="text-4xl mb-3">🛠</p>
+              <p class="text-sm">スキルはまだ登録されていません</p>
+            </div>
+          </template>
+          <div class="space-y-6">
+            <template x-for="cat in ['language','framework','infra','domain']" :key="cat">
+              <div x-show="getSkillsByCategory(cat).length > 0">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3"
+                    x-text="skillCategoryLabel(cat)"></h3>
+                <div class="space-y-3">
+                  <template x-for="skill in getSkillsByCategory(cat)" :key="skill.id || skill.name">
+                    <div class="flex items-center justify-between py-1">
+                      <span class="skill-tag text-sm"
+                            :class="`skill-tag-${skill.category}`"
+                            x-text="skill.name"></span>
+                      <div class="flex items-center gap-3">
+                        <div x-html="skillDotsHtml(skill.level, skill.category)"></div>
+                        <span class="text-xs text-gray-400 w-10 text-right"
+                              x-text="`${skill.level}/5`"></span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 資格タブ ===== -->
+      <div x-show="activeTab === 'certs'">
+        <div class="card">
+          <template x-if="(targetUser?.certifications || []).length === 0">
+            <div class="text-center py-12 text-gray-400">
+              <p class="text-4xl mb-3">📜</p>
+              <p class="text-sm">資格はまだ登録されていません</p>
+            </div>
+          </template>
+          <div class="space-y-3">
+            <template x-for="cert in (targetUser?.certifications || [])" :key="cert.id || cert.name">
+              <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-xl">
+                <span class="text-2xl flex-shrink-0 mt-0.5">📜</span>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-900 text-sm" x-text="cert.name"></p>
+                  <div class="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
+                    <span x-show="cert.issuer" x-text="cert.issuer"></span>
+                    <span x-show="cert.acquiredAt">
+                      取得: <span x-text="formatMonth(cert.acquiredAt)"></span>
+                    </span>
+                    <span x-show="cert.expiresAt"
+                          :class="isExpiringSoon(cert.expiresAt) ? 'text-amber-600 font-medium' : ''">
+                      有効期限: <span x-text="formatMonth(cert.expiresAt)"></span>
+                      <span x-show="isExpiringSoon(cert.expiresAt)"> ⚠️</span>
+                    </span>
+                    <span x-show="!cert.expiresAt" class="text-gray-400">有効期限: なし</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== パーソナリティタブ ===== -->
+      <div x-show="activeTab === 'personality'">
+
+        <!-- 非公開の場合 -->
+        <template x-if="!personalityVisible">
+          <div class="card text-center py-16">
+            <p class="text-4xl mb-3">🔒</p>
+            <p class="text-base font-medium text-gray-500">非公開に設定されています</p>
+            <p class="text-sm text-gray-400 mt-1">本人または管理者のみ閲覧できます</p>
+          </div>
+        </template>
+
+        <template x-if="personalityVisible">
+          <div class="space-y-6">
+
+            <!-- StrengthsFinder -->
+            <div class="card" x-show="(targetUser?.personality?.strengthsTop5 || []).filter(s=>s).length > 0">
+              <h2 class="text-base font-semibold text-gray-900 mb-4">StrengthsFinder®</h2>
+
+              <!-- TOP5 タグ -->
+              <div class="mb-4">
+                <p class="text-xs text-gray-500 mb-2">TOP 5 資質</p>
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="(s, i) in (targetUser?.personality?.strengthsTop5 || []).filter(s=>s)"
+                            :key="i">
+                    <span class="badge-chip badge-indigo text-sm">
+                      <span class="text-xs text-indigo-400 mr-0.5" x-text="`#${i+1}`"></span>
+                      <span x-text="s"></span>
+                    </span>
+                  </template>
+                </div>
+              </div>
+
+              <!-- レーダーチャート -->
+              <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 items-center">
+                <canvas id="strengthsChart" height="240"></canvas>
+                <div class="space-y-2">
+                  <template x-for="(score, domain) in strengthsDomainScores" :key="domain">
+                    <div>
+                      <div class="flex justify-between text-xs text-gray-600 mb-1">
+                        <span x-text="domain"></span>
+                        <span x-text="`${score}pt`"></span>
+                      </div>
+                      <div class="progress-track">
+                        <div class="progress-fill" :style="`width: ${(score / 5) * 100}%`"></div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- MBTI -->
+            <div class="card" x-show="targetUser?.personality?.mbtiType">
+              <h2 class="text-base font-semibold text-gray-900 mb-4">MBTI</h2>
+              <div class="flex items-center gap-4 mb-6">
+                <span class="text-4xl font-bold text-indigo-600"
+                      x-text="targetUser?.personality?.mbtiType"></span>
+                <div>
+                  <p class="font-semibold text-gray-800"
+                     x-text="mbtiTypeName(targetUser?.personality?.mbtiType)"></p>
+                  <p class="text-xs text-gray-500">16タイプ性格分類</p>
+                </div>
+              </div>
+
+              <!-- 4軸バー -->
+              <div class="space-y-4">
+                <template x-for="axis in mbtiAxes" :key="axis.key">
+                  <div>
+                    <div class="flex justify-between text-xs text-gray-500 mb-1">
+                      <span x-text="axis.left"></span>
+                      <span x-text="axis.right"></span>
+                    </div>
+                    <div class="relative h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div class="absolute inset-y-0 left-0 bg-indigo-500 rounded-full transition-all"
+                           :style="`width: ${getMbtiAxisScore(axis.key)}%`"></div>
+                      <div class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2
+                                  border-indigo-600 rounded-full shadow transition-all"
+                           :style="`left: calc(${getMbtiAxisScore(axis.key)}% - 6px)`"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-400 mt-0.5">
+                      <span x-text="axis.leftLabel"></span>
+                      <span x-text="axis.rightLabel"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- 未設定 -->
+            <div class="card" x-show="!(targetUser?.personality?.strengthsTop5 || []).filter(s=>s).length
+                                     && !targetUser?.personality?.mbtiType">
+              <div class="text-center py-12 text-gray-400">
+                <p class="text-4xl mb-3">🧠</p>
+                <p class="text-sm">パーソナリティはまだ登録されていません</p>
+              </div>
+            </div>
+
+          </div>
+        </template>
+      </div>
+
+      <!-- ===== 活動タブ ===== -->
+      <div x-show="activeTab === 'activity'" class="space-y-6">
+
+        <!-- ヒートマップ -->
+        <div class="card">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-semibold text-gray-900">活動カレンダー</h2>
+            <div class="flex items-center gap-1.5 text-xs text-gray-400">
+              <span>少</span>
+              <div class="heatmap-cell hm-0"></div>
+              <div class="heatmap-cell hm-1"></div>
+              <div class="heatmap-cell hm-2"></div>
+              <div class="heatmap-cell hm-3"></div>
+              <div class="heatmap-cell hm-4"></div>
+              <span>多</span>
+            </div>
+          </div>
+          <div class="heatmap-wrapper">
+            <div id="profileHeatmap"></div>
+          </div>
+          <div class="flex gap-6 mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
+            <span>累計 <strong class="text-gray-900" x-text="totalHours"></strong></span>
+            <span>ストリーク <strong class="text-gray-900"><span x-text="streak"></span>日</strong></span>
+          </div>
+        </div>
+
+        <!-- バッジ -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">バッジ</h2>
+          <div class="grid grid-cols-3 gap-3 lg:grid-cols-5">
+            <template x-for="b in allBadges" :key="b.code">
+              <div class="flex flex-col items-center p-3 rounded-xl border border-gray-100 text-center"
+                   :class="earnedBadgeCodes.has(b.code) ? '' : 'opacity-40 grayscale'"
+                   :title="b.description">
+                <span class="text-3xl mb-1" x-text="b.icon"></span>
+                <p class="text-xs font-medium text-gray-700 leading-tight" x-text="b.name"></p>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ユーザーが見つからない場合 -->
+    <div x-show="!targetUser" class="flex flex-col items-center justify-center h-full text-gray-400">
+      <p class="text-5xl mb-4">👤</p>
+      <p class="text-base">ユーザーが見つかりませんでした</p>
+      <button @click="TH.nav.go('members')"
+              class="mt-4 text-sm text-indigo-600 hover:underline">メンバー一覧へ</button>
+    </div>
+  </main>
+</div>
+
+<script>
+function profileViewApp() {
+  return {
+    currentUser: null,
+    targetUser: null,
+    activeTab: 'skills',
+    strengthsDomainScores: {},
+    totalHours: '0時間',
+    streak: 0,
+    earnedBadgeCodes: new Set(),
+    allBadges: [],
+
+    mbtiAxes: [
+      { key: 'EI', left: 'E 外向型', right: 'I 内向型', leftLabel: 'Extravert', rightLabel: 'Introvert' },
+      { key: 'SN', left: 'S 感覚型', right: 'N 直感型', leftLabel: 'Sensing',   rightLabel: 'iNtuition' },
+      { key: 'TF', left: 'T 思考型', right: 'F 感情型', leftLabel: 'Thinking',  rightLabel: 'Feeling' },
+      { key: 'JP', left: 'J 判断型', right: 'P 知覚型', leftLabel: 'Judging',   rightLabel: 'Perceiving' },
+    ],
+
+    // MBTI軸スコア (0=左側100%, 100=右側100%)
+    MBTI_AXIS_SCORES: {
+      INTJ: { EI: 20, SN: 80, TF: 25, JP: 20 },
+      INTP: { EI: 20, SN: 80, TF: 25, JP: 75 },
+      ENTJ: { EI: 80, SN: 80, TF: 25, JP: 20 },
+      ENTP: { EI: 80, SN: 80, TF: 25, JP: 75 },
+      INFJ: { EI: 20, SN: 80, TF: 75, JP: 20 },
+      INFP: { EI: 20, SN: 80, TF: 75, JP: 75 },
+      ENFJ: { EI: 80, SN: 80, TF: 75, JP: 20 },
+      ENFP: { EI: 80, SN: 80, TF: 75, JP: 75 },
+      ISTJ: { EI: 20, SN: 25, TF: 25, JP: 20 },
+      ISFJ: { EI: 20, SN: 25, TF: 75, JP: 20 },
+      ESTJ: { EI: 80, SN: 25, TF: 25, JP: 20 },
+      ESFJ: { EI: 80, SN: 25, TF: 75, JP: 20 },
+      ISTP: { EI: 20, SN: 25, TF: 25, JP: 75 },
+      ISFP: { EI: 20, SN: 25, TF: 75, JP: 75 },
+      ESTP: { EI: 80, SN: 25, TF: 25, JP: 75 },
+      ESFP: { EI: 80, SN: 25, TF: 75, JP: 75 },
+    },
+
+    MBTI_TYPE_NAMES: {
+      INTJ: 'アーキテクト型', INTP: '論理学者型',  ENTJ: '指揮官型',   ENTP: '討論者型',
+      INFJ: '提唱者型',      INFP: '仲介者型',    ENFJ: '主人公型',   ENFP: '広報運動家型',
+      ISTJ: '管理者型',      ISFJ: '擁護者型',    ESTJ: '幹部型',     ESFJ: '領事館型',
+      ISTP: '巨匠型',        ISFP: '冒険家型',    ESTP: '起業家型',   ESFP: 'エンターテイナー型',
+    },
+
+    get isOwnProfile() {
+      return this.currentUser && this.targetUser && this.currentUser.id === this.targetUser.id;
+    },
+
+    get personalityVisible() {
+      if (!this.targetUser?.personality) return false;
+      const vis = this.targetUser.personality.visibility || 'public';
+      if (vis === 'public') return true;
+      if (vis === 'private') return this.isOwnProfile;
+      if (vis === 'role_limited') {
+        return this.isOwnProfile ||
+               this.currentUser?.role === 'admin' ||
+               this.currentUser?.role === 'senior';
+      }
+      return true;
+    },
+
+    init() {
+      if (!TH.auth.guard()) return;
+      this.currentUser = TH.auth.getCurrentUser();
+      TH.ui.renderSidebar('sidebar', '');
+
+      const uid = localStorage.getItem('th_viewing_user_id')
+               || new URLSearchParams(location.search).get('userId');
+      this.targetUser = uid ? TH.data.getUserById(uid) : this.currentUser;
+
+      if (!this.targetUser) return;
+
+      this.totalHours = TH.fmt.totalHours(TH.data.getTotalMinutes(this.targetUser.id));
+      this.streak = TH.data.getStreak(this.targetUser.id);
+      this.earnedBadgeCodes = new Set(TH.data.getEarnedBadgeCodes(this.targetUser.id));
+
+      // バッジ定義（data.jsのBADGE_DEFINITIONSを利用）
+      this.allBadges = TH.data.getEarnedBadges('__all__') || this._getAllBadgeDefs();
+
+      // StrengthsDomainScores
+      const top5 = (this.targetUser.personality?.strengthsTop5 || []).filter(s => s);
+      if (top5.length > 0) {
+        this.strengthsDomainScores = TH.data.getStrengthsDomainScores(top5);
+      }
+    },
+
+    _getAllBadgeDefs() {
+      // BADGE_DEFINITIONSから全バッジ一覧を返す（data.jsのグローバル参照）
+      const defs = [
+        { code: 'hours_10',   name: '10時間達成',   icon: '⏱️',  description: '累計10時間学習' },
+        { code: 'hours_50',   name: '50時間達成',   icon: '📘',  description: '累計50時間学習' },
+        { code: 'hours_100',  name: '100時間達成',  icon: '💯',  description: '累計100時間学習' },
+        { code: 'hours_300',  name: '300時間達成',  icon: '🚀',  description: '累計300時間学習' },
+        { code: 'hours_500',  name: '500時間達成',  icon: '⭐',  description: '累計500時間学習' },
+        { code: 'hours_1000', name: '1000時間達成', icon: '👑',  description: '累計1000時間学習' },
+        { code: 'certs_1',    name: '資格1件取得',  icon: '📜',  description: '資格を1件取得' },
+        { code: 'certs_3',    name: '資格3件取得',  icon: '📚',  description: '資格を3件取得' },
+        { code: 'certs_5',    name: '資格5件取得',  icon: '🎓',  description: '資格を5件取得' },
+        { code: 'certs_10',   name: '資格10件取得', icon: '🏛️', description: '資格を10件取得' },
+        { code: 'streak_7',   name: '7日連続',      icon: '🔥',  description: '7日連続学習' },
+        { code: 'streak_30',  name: '30日連続',     icon: '💪',  description: '30日連続学習' },
+        { code: 'streak_100', name: '100日連続',    icon: '🌟',  description: '100日連続学習' },
+        { code: 'profile_complete',    name: 'プロフ充実',  icon: '✅', description: 'プロフィール完成' },
+        { code: 'personality_public',  name: '公開設定済', icon: '🌈', description: 'パーソナリティ公開' },
+      ];
+      return defs;
+    },
+
+    switchToPersonality() {
+      this.activeTab = 'personality';
+      this.$nextTick(() => this.renderStrengthsChart());
+    },
+
+    switchToActivity() {
+      this.activeTab = 'activity';
+      this.$nextTick(() => {
+        TH.ui.renderHeatmap('profileHeatmap', this.targetUser.id, 26);
+        // バッジ全定義を再セット
+        if (this.allBadges.length === 0) {
+          this.allBadges = this._getAllBadgeDefs();
+        }
+      });
+    },
+
+    renderStrengthsChart() {
+      const top5 = (this.targetUser?.personality?.strengthsTop5 || []).filter(s => s);
+      if (top5.length === 0) return;
+
+      const scores = TH.data.getStrengthsDomainScores(top5);
+      this.strengthsDomainScores = scores;
+      const labels = Object.keys(scores);
+      const data   = Object.values(scores);
+
+      const ctx = document.getElementById('strengthsChart');
+      if (!ctx) return;
+      if (window._strengthsChart) window._strengthsChart.destroy();
+      window._strengthsChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: 'rgba(79,70,229,0.15)',
+            borderColor: '#4F46E5',
+            borderWidth: 2,
+            pointBackgroundColor: '#4F46E5',
+            pointRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            r: {
+              min: 0,
+              max: 5,
+              ticks: { stepSize: 1, font: { size: 10 } },
+              pointLabels: { font: { size: 11 } },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+            }
+          },
+          plugins: { legend: { display: false } },
+        }
+      });
+    },
+
+    getSkillsByCategory(cat) {
+      return (this.targetUser?.skills || []).filter(s => s.category === cat);
+    },
+
+    getMbtiAxisScore(axisKey) {
+      const type = this.targetUser?.personality?.mbtiType;
+      if (!type) return 50;
+      return (this.MBTI_AXIS_SCORES[type] || {})[axisKey] ?? 50;
+    },
+
+    mbtiTypeName(type) {
+      return this.MBTI_TYPE_NAMES[type] || '';
+    },
+
+    formatMonth(ym) {
+      if (!ym) return '';
+      const [y, m] = ym.split('-');
+      return `${y}年${m}月`;
+    },
+
+    isExpiringSoon(expiresAt) {
+      if (!expiresAt) return false;
+      const exp = new Date(expiresAt + '-01');
+      const now = new Date();
+      const diff = (exp - now) / (1000 * 60 * 60 * 24 * 30);
+      return diff >= 0 && diff <= 3;
+    },
+
+    skillDotsHtml(level, category) {
+      return TH.ui.skillDotsHtml(level, category);
+    },
+
+    skillCategoryLabel(cat) {
+      return TH.fmt.skillCategoryLabel ? TH.fmt.skillCategoryLabel(cat) : cat;
+    },
+
+    roleLabel(role) { return TH.fmt.roleLabel(role); },
+
+    goBack() {
+      if (document.referrer && document.referrer.includes(location.hostname)) {
+        history.back();
+      } else {
+        TH.nav.go('members');
+      }
+    },
+
+    goToEdit() {
+      TH.nav.go('profile-edit');
+    },
+  }
+}
+</script>
+</body>
+</html>

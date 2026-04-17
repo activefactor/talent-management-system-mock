@@ -1,0 +1,412 @@
+/* ============================================================
+   TalentHub Mock - Custom Styles
+   Tailwindで表現できないもののみここに書く
+   ============================================================ */
+
+/* Alpine.js 初期化前の非表示 */
+[x-cloak] { display: none !important; }
+
+/* ============================================================
+   レイアウト
+   ============================================================ */
+
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #F9FAFB;
+}
+
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+  border-right: 1px solid #E5E7EB;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ============================================================
+   サイドバー
+   ============================================================ */
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #6B7280;
+  transition: background-color 0.15s, color 0.15s;
+  text-decoration: none;
+  user-select: none;
+}
+
+.sidebar-nav-item:hover {
+  background-color: #F3F4F6;
+  color: #111827;
+}
+
+.sidebar-nav-item.active {
+  background-color: #EEF2FF;
+  color: #4F46E5;
+  font-weight: 500;
+}
+
+.sidebar-nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   学習ヒートマップ
+   ============================================================ */
+
+.heatmap-wrapper {
+  overflow-x: auto;
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-flow: column;
+  gap: 3px;
+  width: fit-content;
+}
+
+.heatmap-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  cursor: default;
+}
+
+.heatmap-cell:hover {
+  opacity: 0.8;
+  outline: 1px solid rgba(0,0,0,0.2);
+}
+
+/* レベル別色（DESIGN.md 準拠） */
+.hm-0 { background-color: #ebedf0; }
+.hm-1 { background-color: #9be9a8; }
+.hm-2 { background-color: #40c463; }
+.hm-3 { background-color: #30a14e; }
+.hm-4 { background-color: #216e39; }
+
+/* ============================================================
+   スキルレベルドット
+   ============================================================ */
+
+.skill-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.skill-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.skill-dot-filled-language  { background-color: #4F46E5; }
+.skill-dot-filled-framework { background-color: #7C3AED; }
+.skill-dot-filled-infra     { background-color: #EA580C; }
+.skill-dot-filled-domain    { background-color: #0D9488; }
+.skill-dot-filled-default   { background-color: #6B7280; }
+.skill-dot-empty            { background-color: #E5E7EB; }
+
+/* ============================================================
+   タグ・バッジ
+   ============================================================ */
+
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.skill-tag-language  { background-color: #EEF2FF; color: #4338CA; }
+.skill-tag-framework { background-color: #F5F3FF; color: #6D28D9; }
+.skill-tag-infra     { background-color: #FFF7ED; color: #C2410C; }
+.skill-tag-domain    { background-color: #F0FDFA; color: #0F766E; }
+.skill-tag-interest  { background-color: #F0F9FF; color: #0369A1; }
+
+.badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge-amber  { background-color: #FEF3C7; color: #92400E; }
+.badge-orange { background-color: #FFEDD5; color: #9A3412; }
+.badge-blue   { background-color: #DBEAFE; color: #1E40AF; }
+.badge-indigo { background-color: #E0E7FF; color: #3730A3; }
+.badge-purple { background-color: #F3E8FF; color: #6B21A8; }
+.badge-green  { background-color: #D1FAE5; color: #065F46; }
+.badge-red    { background-color: #FEE2E2; color: #991B1B; }
+
+/* ============================================================
+   カード
+   ============================================================ */
+
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 20px;
+}
+
+/* ============================================================
+   タブ
+   ============================================================ */
+
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #E5E7EB;
+  overflow-x: auto;
+}
+
+.tab-btn {
+  padding: 10px 16px;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: #6B7280;
+  white-space: nowrap;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  transition: color 0.15s;
+  margin-bottom: -1px;
+}
+
+.tab-btn:hover { color: #374151; }
+
+.tab-btn.active {
+  border-bottom-color: #4F46E5;
+  color: #4F46E5;
+  font-weight: 500;
+}
+
+/* ============================================================
+   トースト通知
+   ============================================================ */
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: toast-in 0.3s ease;
+  max-width: 320px;
+}
+
+.toast-success { background-color: #059669; color: #ffffff; }
+.toast-error   { background-color: #DC2626; color: #ffffff; }
+.toast-info    { background-color: #2563EB; color: #ffffff; }
+
+@keyframes toast-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ============================================================
+   アニメーション
+   ============================================================ */
+
+.fade-in {
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   スクロールバー（Webkit）
+   ============================================================ */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+
+/* ============================================================
+   アバター（イニシャル表示）
+   ============================================================ */
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 600;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   ロールバッジ
+   ============================================================ */
+
+.role-badge-admin    { background-color: #FEF3C7; color: #92400E; }
+.role-badge-senior   { background-color: #E0E7FF; color: #3730A3; }
+.role-badge-engineer { background-color: #F0FDF4; color: #166534; }
+
+/* ============================================================
+   フォーム
+   ============================================================ */
+
+.form-input {
+  width: 100%;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #111827;
+  background: #ffffff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-input::placeholder {
+  color: #9CA3AF;
+}
+
+/* ============================================================
+   プログレスバー
+   ============================================================ */
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background-color: #E5E7EB;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #4F46E5;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+/* ============================================================
+   スキルマップテーブル（管理者画面）
+   ============================================================ */
+
+.skill-map-table th,
+.skill-map-table td {
+  border: 1px solid #F3F4F6;
+}
+
+.skill-map-table th {
+  background-color: #F9FAFB;
+  font-weight: 600;
+  font-size: 12px;
+  color: #6B7280;
+}
+
+/* ============================================================
+   トグルスイッチ
+   ============================================================ */
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #D1D5DB;
+  border-radius: 9999px;
+  transition: background-color 0.2s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #4F46E5;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+/* ============================================================
+   ユーティリティ
+   ============================================================ */
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

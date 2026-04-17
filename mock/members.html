@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>メンバー検索 - TalentHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/common.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body x-data="membersApp()" x-init="init()" x-cloak>
+<div class="app-layout">
+
+  <!-- サイドバー -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- メインコンテンツ -->
+  <main class="main-content">
+    <div class="max-w-6xl mx-auto fade-in">
+
+      <!-- ページタイトル -->
+      <h1 class="text-2xl font-bold text-gray-900 mb-6">メンバー検索 👥</h1>
+
+      <!-- 検索・フィルターバー -->
+      <div class="card mb-6">
+        <div class="flex flex-wrap gap-3 items-center">
+
+          <!-- キーワード検索 -->
+          <div class="flex-1 min-w-56 relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+                 fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+            </svg>
+            <input type="text" x-model="searchQuery"
+                   placeholder="スキル名・氏名・部署で検索..."
+                   class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm
+                          focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow">
+          </div>
+
+          <!-- 部署フィルター -->
+          <select x-model="filterDept"
+                  class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <option value="">全部署</option>
+            <template x-for="dept in departments" :key="dept">
+              <option :value="dept" x-text="dept"></option>
+            </template>
+          </select>
+
+          <!-- ロールフィルター -->
+          <select x-model="filterRole"
+                  class="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+            <option value="">全ロール</option>
+            <option value="admin">管理者</option>
+            <option value="senior">シニア</option>
+            <option value="engineer">エンジニア</option>
+          </select>
+
+          <!-- 相談受付中チェックボックス -->
+          <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+            <input type="checkbox" x-model="onlyConsultation" class="accent-indigo-600 w-4 h-4">
+            相談受付中のみ
+          </label>
+
+          <!-- 件数表示 -->
+          <span class="text-sm text-gray-500 ml-auto whitespace-nowrap">
+            <span class="font-medium text-gray-900" x-text="totalCount"></span>件中
+            <span class="font-medium text-indigo-600" x-text="filteredUsers.length"></span>件を表示
+          </span>
+        </div>
+      </div>
+
+      <!-- ユーザーカードグリッド -->
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+
+        <template x-for="u in filteredUsers" :key="u.id">
+          <div class="card cursor-pointer hover:shadow-md transition-shadow group"
+               @click="goToProfile(u.id)">
+
+            <!-- ヘッダー: アバター + 基本情報 -->
+            <div class="flex items-start gap-3 mb-3">
+              <div class="avatar w-12 h-12 text-base flex-shrink-0"
+                   :style="`background: ${u.avatarColor}`"
+                   x-text="u.avatarInitial"></div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="font-semibold text-gray-900 text-sm group-hover:text-indigo-600 transition-colors"
+                     x-text="u.name"></p>
+                  <span class="role-badge-admin text-xs px-2 py-0.5 rounded-full font-medium"
+                        :class="`role-badge-${u.role}`"
+                        x-text="roleLabel(u.role)"></span>
+                </div>
+                <p class="text-xs text-gray-500 mt-0.5 truncate"
+                   x-text="`${u.department} · ${u.position}`"></p>
+
+                <!-- 相談受付バッジ -->
+                <span x-show="u.isAcceptingConsultation"
+                      class="inline-flex items-center gap-1 mt-1 text-xs text-emerald-700
+                             bg-emerald-50 px-2 py-0.5 rounded-full">
+                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0
+                         01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75
+                         0 011.05-.143z" clip-rule="evenodd"/>
+                  </svg>
+                  相談受付中
+                </span>
+              </div>
+            </div>
+
+            <!-- スキルタグ -->
+            <div class="flex flex-wrap gap-1.5 mb-3" x-show="getTopSkills(u, 4).length > 0">
+              <template x-for="skill in getTopSkills(u, 4)" :key="skill.name">
+                <span class="skill-tag text-xs"
+                      :class="[
+                        `skill-tag-${skill.category}`,
+                        isCommonSkill(u, skill.name) ? 'ring-2 ring-indigo-400' : ''
+                      ]"
+                      x-text="skill.name"></span>
+              </template>
+              <span x-show="u.skills.length > 4"
+                    class="skill-tag skill-tag-domain text-xs"
+                    x-text="`+${u.skills.length - 4}`"></span>
+            </div>
+
+            <!-- フッター: 累計時間 + バッジ + 共通スキル -->
+            <div class="border-t border-gray-100 pt-3 space-y-2">
+              <div class="flex items-center gap-4 text-xs text-gray-500">
+                <span class="flex items-center gap-1">
+                  <span>⏱</span>
+                  <span>累計 <span class="font-medium text-gray-700" x-text="getTotalHours(u.id)"></span></span>
+                </span>
+                <span class="flex items-center gap-1">
+                  <span>🏅</span>
+                  <span>バッジ <span class="font-medium text-gray-700" x-text="getBadgeCount(u.id)"></span>個</span>
+                </span>
+              </div>
+
+              <!-- 共通スキルハイライト -->
+              <div x-show="getCommonSkills(u).length > 0" class="flex flex-wrap gap-1">
+                <span class="text-xs text-emerald-600 font-medium">共通:</span>
+                <template x-for="skill in getCommonSkills(u).slice(0, 3)" :key="skill">
+                  <span class="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded"
+                        x-text="skill"></span>
+                </template>
+              </div>
+            </div>
+
+          </div>
+        </template>
+
+        <!-- 0件時 -->
+        <div x-show="filteredUsers.length === 0"
+             class="col-span-3 flex flex-col items-center justify-center py-20 text-gray-400">
+          <p class="text-5xl mb-4">🔍</p>
+          <p class="text-base font-medium text-gray-500 mb-1">該当するメンバーが見つかりませんでした</p>
+          <p class="text-sm">検索条件を変更して再度お試しください</p>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function membersApp() {
+  return {
+    currentUser: null,
+    searchQuery: '',
+    filterDept: '',
+    filterRole: '',
+    onlyConsultation: false,
+
+    get totalCount() {
+      return TH.data.getUsers().filter(u => u.id !== this.currentUser?.id).length;
+    },
+
+    get filteredUsers() {
+      if (!this.currentUser) return [];
+      const q = this.searchQuery.trim().toLowerCase();
+      const mySkillNames = new Set((this.currentUser.skills || []).map(s => s.name));
+
+      return TH.data.getUsers()
+        .filter(u => {
+          if (u.id === this.currentUser.id) return false;
+          if (this.filterDept && u.department !== this.filterDept) return false;
+          if (this.filterRole && u.role !== this.filterRole) return false;
+          if (this.onlyConsultation && !u.isAcceptingConsultation) return false;
+          if (!q) return true;
+
+          const targets = [
+            u.name,
+            u.department,
+            u.position,
+            u.grade || '',
+            ...(u.skills || []).map(s => s.name),
+            ...(u.certifications || []).map(c => c.name),
+            ...(u.interestTags || []),
+            ...(u.consultationTags || []),
+          ].join(' ').toLowerCase();
+
+          return targets.includes(q);
+        })
+        .sort((a, b) => {
+          // 共通スキル数が多い順 → joinYear 降順
+          const aCommon = (a.skills || []).filter(s => mySkillNames.has(s.name)).length;
+          const bCommon = (b.skills || []).filter(s => mySkillNames.has(s.name)).length;
+          if (bCommon !== aCommon) return bCommon - aCommon;
+          return (b.joinYear || 0) - (a.joinYear || 0);
+        });
+    },
+
+    get departments() {
+      const depts = [...new Set(TH.data.getUsers().map(u => u.department))];
+      return depts.sort();
+    },
+
+    init() {
+      if (!TH.auth.guard()) return;
+      this.currentUser = TH.auth.getCurrentUser();
+      TH.ui.renderSidebar('sidebar', 'members');
+    },
+
+    getCommonSkills(targetUser) {
+      if (!this.currentUser) return [];
+      const mySkills = new Set((this.currentUser.skills || []).map(s => s.name));
+      return (targetUser.skills || [])
+        .filter(s => mySkills.has(s.name))
+        .map(s => s.name);
+    },
+
+    isCommonSkill(targetUser, skillName) {
+      if (!this.currentUser) return false;
+      return (this.currentUser.skills || []).some(s => s.name === skillName);
+    },
+
+    getTopSkills(user, n) {
+      return (user.skills || [])
+        .slice()
+        .sort((a, b) => b.level - a.level)
+        .slice(0, n || 4);
+    },
+
+    getTotalHours(userId) {
+      return TH.fmt.totalHours(TH.data.getTotalMinutes(userId));
+    },
+
+    getBadgeCount(userId) {
+      return TH.data.getEarnedBadges(userId).length;
+    },
+
+    roleLabel(role) {
+      return TH.fmt.roleLabel(role);
+    },
+
+    goToProfile(userId) {
+      TH.nav.go('profile-view', userId);
+    },
+  }
+}
+</script>
+</body>
+</html>

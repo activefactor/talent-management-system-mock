@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ダッシュボード - TalentHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/common.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body x-data="dashboardApp()" x-init="init()" x-cloak>
+<div class="app-layout">
+
+  <!-- サイドバー -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- メインコンテンツ -->
+  <main class="main-content">
+    <div class="max-w-6xl mx-auto fade-in">
+
+      <!-- ページヘッダー -->
+      <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900"
+            x-text="`${greeting}、${user?.name?.split(' ')[1] ?? ''}さん ${greetingIcon}`"></h1>
+        <p class="text-sm text-gray-500 mt-1" x-text="todayStr"></p>
+      </div>
+
+      <!-- サマリーカード 4枚 -->
+      <div class="grid grid-cols-2 gap-4 mb-6 lg:grid-cols-4">
+
+        <!-- 今週の活動 -->
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">🟢</span>
+            <span class="text-xs text-gray-500 font-medium">今週の活動</span>
+          </div>
+          <p class="text-2xl font-bold text-emerald-600" x-text="formatHours(weekMinutes)"></p>
+        </div>
+
+        <!-- 累計時間 -->
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">📚</span>
+            <span class="text-xs text-gray-500 font-medium">累計学習時間</span>
+          </div>
+          <p class="text-2xl font-bold text-indigo-600" x-text="formatHours(totalMinutes)"></p>
+        </div>
+
+        <!-- ストリーク -->
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">🔥</span>
+            <span class="text-xs text-gray-500 font-medium">継続ストリーク</span>
+          </div>
+          <p class="text-2xl font-bold text-amber-600"><span x-text="streak"></span><span class="text-base font-medium text-gray-400 ml-1">日</span></p>
+        </div>
+
+        <!-- バッジ数 -->
+        <div class="card">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">🏅</span>
+            <span class="text-xs text-gray-500 font-medium">獲得バッジ</span>
+          </div>
+          <p class="text-2xl font-bold text-purple-600"><span x-text="earnedBadges.length"></span><span class="text-base font-medium text-gray-400 ml-1">個</span></p>
+        </div>
+      </div>
+
+      <!-- 活動ヒートマップ -->
+      <div class="card mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-semibold text-gray-900">活動カレンダー</h2>
+          <div class="flex items-center gap-1.5 text-xs text-gray-400">
+            <span>少</span>
+            <div class="heatmap-cell hm-0"></div>
+            <div class="heatmap-cell hm-1"></div>
+            <div class="heatmap-cell hm-2"></div>
+            <div class="heatmap-cell hm-3"></div>
+            <div class="heatmap-cell hm-4"></div>
+            <span>多</span>
+          </div>
+        </div>
+        <div class="heatmap-wrapper">
+          <div id="heatmap"></div>
+        </div>
+      </div>
+
+      <!-- 2カラム: クイック記録 + 次のバッジ -->
+      <div class="grid grid-cols-1 gap-4 mb-6 lg:grid-cols-2">
+
+        <!-- クイック記録 -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">今日の記録 ✏️</h2>
+
+          <!-- カテゴリ選択 -->
+          <div class="flex flex-wrap gap-2 mb-3">
+            <template x-for="cat in categories" :key="cat.value">
+              <button @click="logForm.category = cat.value"
+                      :class="logForm.category === cat.value
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                      class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                <span x-text="cat.icon"></span>
+                <span x-text="cat.label"></span>
+              </button>
+            </template>
+          </div>
+
+          <!-- タイトル入力 -->
+          <input type="text" x-model="logForm.title" placeholder="何を学んだ？"
+                 @keydown.enter="addLog()"
+                 class="form-input mb-3 text-sm">
+
+          <!-- 時間 + 記録ボタン -->
+          <div class="flex gap-2">
+            <select x-model="logForm.durationMinutes"
+                    class="form-input text-sm flex-1">
+              <option value="15">15分</option>
+              <option value="30">30分</option>
+              <option value="45">45分</option>
+              <option value="60" selected>60分</option>
+              <option value="90">90分</option>
+              <option value="120">120分</option>
+              <option value="180">180分</option>
+            </select>
+            <button @click="addLog()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+                           px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+              記録する
+            </button>
+          </div>
+        </div>
+
+        <!-- 次のバッジ進捗 -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">次のバッジまで 🏅</h2>
+          <template x-if="nextBadge">
+            <div>
+              <div class="flex items-center gap-3 mb-4">
+                <span class="text-3xl" x-text="nextBadge.icon"></span>
+                <div>
+                  <p class="font-semibold text-gray-900 text-sm" x-text="nextBadge.name"></p>
+                  <p class="text-xs text-gray-500" x-text="nextBadge.description"></p>
+                </div>
+              </div>
+              <div class="progress-track mb-2">
+                <div class="progress-fill" :style="`width: ${nextBadgeProgress}%`"></div>
+              </div>
+              <div class="flex justify-between text-xs text-gray-500">
+                <span x-text="nextBadgeCurrentLabel"></span>
+                <span x-text="`${Math.round(nextBadgeProgress)}%`"></span>
+              </div>
+            </div>
+          </template>
+          <template x-if="!nextBadge">
+            <div class="flex flex-col items-center justify-center h-24 text-gray-400">
+              <span class="text-3xl mb-2">🎉</span>
+              <p class="text-sm">すべてのバッジを獲得しました！</p>
+            </div>
+          </template>
+
+          <!-- 取得済みバッジ一覧 -->
+          <template x-if="earnedBadges.length > 0">
+            <div class="mt-4 pt-4 border-t border-gray-100">
+              <p class="text-xs text-gray-500 mb-2">取得済み</p>
+              <div class="flex flex-wrap gap-1.5">
+                <template x-for="b in earnedBadges" :key="b.code">
+                  <span class="badge-chip badge-indigo text-xs" :title="b.name">
+                    <span x-text="b.icon"></span>
+                    <span x-text="b.name"></span>
+                  </span>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 2カラム: カテゴリ内訳 + おすすめメンバー -->
+      <div class="grid grid-cols-1 gap-4 mb-6 lg:grid-cols-2">
+
+        <!-- カテゴリ別ドーナツ -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">カテゴリ別内訳</h2>
+          <template x-if="hasCategoryData">
+            <canvas id="categoryChart" height="220"></canvas>
+          </template>
+          <template x-if="!hasCategoryData">
+            <div class="flex flex-col items-center justify-center h-40 text-gray-400">
+              <span class="text-3xl mb-2">📊</span>
+              <p class="text-sm">まだ記録がありません</p>
+            </div>
+          </template>
+        </div>
+
+        <!-- おすすめメンバー -->
+        <div class="card">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">共通点のあるメンバー 👥</h2>
+          <template x-if="recommendedUsers.length > 0">
+            <div class="space-y-3">
+              <template x-for="rec in recommendedUsers" :key="rec.user.id">
+                <div @click="goToProfile(rec.user.id)"
+                     class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50
+                            cursor-pointer transition-colors">
+                  <div class="avatar w-10 h-10 text-sm flex-shrink-0"
+                       :style="`background: ${rec.user.avatarColor}`"
+                       x-text="rec.user.avatarInitial"></div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900" x-text="rec.user.name"></p>
+                    <p class="text-xs text-gray-500" x-text="`${rec.user.department} · ${rec.user.position}`"></p>
+                    <div class="flex flex-wrap gap-1 mt-1">
+                      <template x-for="skill in rec.commonSkills.slice(0,3)" :key="skill">
+                        <span class="skill-tag skill-tag-language text-xs" x-text="skill"></span>
+                      </template>
+                    </div>
+                  </div>
+                  <svg class="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                  </svg>
+                </div>
+              </template>
+            </div>
+          </template>
+          <template x-if="recommendedUsers.length === 0">
+            <div class="flex flex-col items-center justify-center h-32 text-gray-400">
+              <span class="text-3xl mb-2">👤</span>
+              <p class="text-sm">スキルを登録すると表示されます</p>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 相談できる先輩 -->
+      <div class="card mb-6">
+        <h2 class="text-base font-semibold text-gray-900 mb-4">相談できる先輩 💬</h2>
+        <template x-if="seniorUsers.length > 0">
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <template x-for="s in seniorUsers" :key="s.id">
+              <div class="border border-gray-100 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+                <div class="flex items-center gap-3 mb-3">
+                  <div class="avatar w-12 h-12 text-base flex-shrink-0"
+                       :style="`background: ${s.avatarColor}`"
+                       x-text="s.avatarInitial"></div>
+                  <div class="min-w-0">
+                    <p class="font-semibold text-gray-900 text-sm" x-text="s.name"></p>
+                    <p class="text-xs text-gray-500 truncate" x-text="`${s.department} · ${s.position}`"></p>
+                  </div>
+                </div>
+                <!-- 相談タグ -->
+                <div class="flex flex-wrap gap-1 mb-3" x-show="s.consultationTags?.length > 0">
+                  <template x-for="tag in (s.consultationTags || []).slice(0,3)" :key="tag">
+                    <span class="skill-tag skill-tag-domain text-xs" x-text="tag"></span>
+                  </template>
+                </div>
+                <button @click.stop="requestConsultation(s.name)"
+                        class="w-full text-xs font-medium text-indigo-600 border border-indigo-200
+                               rounded-lg py-1.5 hover:bg-indigo-50 transition-colors">
+                  相談する
+                </button>
+              </div>
+            </template>
+          </div>
+        </template>
+        <template x-if="seniorUsers.length === 0">
+          <div class="flex flex-col items-center justify-center py-8 text-gray-400">
+            <span class="text-3xl mb-2">🌿</span>
+            <p class="text-sm">現在、相談受付中のシニアエンジニアはいません</p>
+          </div>
+        </template>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+function dashboardApp() {
+  return {
+    user: null,
+    totalMinutes: 0,
+    weekMinutes: 0,
+    streak: 0,
+    earnedBadges: [],
+    recommendedUsers: [],
+    seniorUsers: [],
+    nextBadge: null,
+    nextBadgeProgress: 0,
+    nextBadgeCurrentLabel: '',
+    hasCategoryData: false,
+
+    greeting: 'こんにちは',
+    greetingIcon: '☀️',
+    todayStr: '',
+
+    categories: [
+      { value: 'reading',    label: '読書',      icon: '📖' },
+      { value: 'study',      label: '資格勉強',  icon: '📝' },
+      { value: 'development',label: '個人開発',  icon: '💻' },
+      { value: 'meetup',     label: '勉強会',    icon: '🎤' },
+      { value: 'ojt',        label: 'OJT',       icon: '🏢' },
+      { value: 'other',      label: 'その他',    icon: '📌' },
+    ],
+
+    logForm: {
+      category: 'reading',
+      title: '',
+      durationMinutes: 60,
+    },
+
+    init() {
+      if (!TH.auth.guard()) return;
+      this.user = TH.auth.getCurrentUser();
+      TH.ui.renderSidebar('sidebar', 'dashboard');
+      this._setGreeting();
+      this.loadStats();
+      this.$nextTick(() => {
+        TH.ui.renderHeatmap('heatmap', this.user.id, 26);
+        this.renderCategoryChart();
+      });
+    },
+
+    _setGreeting() {
+      const h = new Date().getHours();
+      if (h < 12)      { this.greeting = 'おはようございます'; this.greetingIcon = '🌅'; }
+      else if (h < 18) { this.greeting = 'こんにちは';         this.greetingIcon = '☀️'; }
+      else             { this.greeting = 'おつかれさまです';   this.greetingIcon = '🌙'; }
+
+      const d = new Date();
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      this.todayStr = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${days[d.getDay()]}）`;
+    },
+
+    loadStats() {
+      const uid = this.user.id;
+      this.totalMinutes  = TH.data.getTotalMinutes(uid);
+      this.streak        = TH.data.getStreak(uid);
+      this.earnedBadges  = TH.data.getEarnedBadges(uid);
+      this.weekMinutes   = this._calcWeekMinutes(uid);
+      this.recommendedUsers = this._getRecommended();
+      this.seniorUsers   = TH.data.getUsers().filter(u =>
+        (u.role === 'senior' || u.role === 'admin') &&
+        u.isAcceptingConsultation &&
+        u.id !== this.user.id
+      ).slice(0, 3);
+      this._calcNextBadge();
+    },
+
+    _calcWeekMinutes(uid) {
+      const now = new Date();
+      const day = now.getDay(); // 0=日
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+      monday.setHours(0,0,0,0);
+      const mondayStr = monday.toISOString().split('T')[0];
+
+      return TH.data.getLogs(uid)
+        .filter(l => l.loggedAt >= mondayStr)
+        .reduce((sum, l) => sum + l.durationMinutes, 0);
+    },
+
+    _getRecommended() {
+      if (!this.user.skills || this.user.skills.length === 0) return [];
+      const mySkillNames = this.user.skills.map(s => s.name);
+
+      return TH.data.getUsers()
+        .filter(u => u.id !== this.user.id)
+        .map(u => {
+          const otherSkills = (u.skills || []).map(s => s.name);
+          const common = mySkillNames.filter(n => otherSkills.includes(n));
+          return { user: u, commonSkills: common };
+        })
+        .filter(r => r.commonSkills.length > 0)
+        .sort((a, b) => b.commonSkills.length - a.commonSkills.length)
+        .slice(0, 3);
+    },
+
+    _calcNextBadge() {
+      const uid = this.user.id;
+      const earned = new Set(TH.data.getEarnedBadgeCodes(uid));
+      const totalMin = TH.data.getTotalMinutes(uid);
+      const totalHours = totalMin / 60;
+      const certCount = (this.user.certifications || []).length;
+
+      // 時間バッジ
+      const hourBadges = [
+        { threshold: 10,   code: 'hours_10',  unit: '時間' },
+        { threshold: 50,   code: 'hours_50',  unit: '時間' },
+        { threshold: 100,  code: 'hours_100', unit: '時間' },
+        { threshold: 300,  code: 'hours_300', unit: '時間' },
+        { threshold: 500,  code: 'hours_500', unit: '時間' },
+        { threshold: 1000, code: 'hours_1000',unit: '時間' },
+      ];
+      const certBadges = [
+        { threshold: 1,  code: 'certs_1',  unit: '件' },
+        { threshold: 3,  code: 'certs_3',  unit: '件' },
+        { threshold: 5,  code: 'certs_5',  unit: '件' },
+        { threshold: 10, code: 'certs_10', unit: '件' },
+      ];
+
+      // まだ取れていない最初の時間バッジを探す
+      let found = null;
+      for (const hb of hourBadges) {
+        if (!earned.has(hb.code)) {
+          const allBadges = TH.data.getEarnedBadges(uid); // フル定義付き
+          // BADGE_DEFINITIONSはdata.jsに定義
+          found = {
+            code: hb.code,
+            name: `${hb.threshold}時間達成`,
+            icon: '⏱️',
+            description: `累計${hb.threshold}時間学習`,
+            threshold: hb.threshold,
+            current: totalHours,
+            unit: hb.unit,
+          };
+          break;
+        }
+      }
+      if (!found) {
+        for (const cb of certBadges) {
+          if (!earned.has(cb.code)) {
+            found = {
+              code: cb.code,
+              name: `資格${cb.threshold}件取得`,
+              icon: '📜',
+              description: `資格を${cb.threshold}件取得`,
+              threshold: cb.threshold,
+              current: certCount,
+              unit: cb.unit,
+            };
+            break;
+          }
+        }
+      }
+
+      if (found) {
+        this.nextBadge = found;
+        this.nextBadgeProgress = Math.min(100, (found.current / found.threshold) * 100);
+        this.nextBadgeCurrentLabel =
+          `${Math.floor(found.current)}${found.unit} / ${found.threshold}${found.unit}`;
+      } else {
+        this.nextBadge = null;
+      }
+    },
+
+    renderCategoryChart() {
+      const uid = this.user.id;
+      const breakdown = TH.data.getCategoryBreakdown(uid);
+      const totalMins = Object.values(breakdown).reduce((s, v) => s + v, 0);
+      this.hasCategoryData = totalMins > 0;
+      if (!this.hasCategoryData) return;
+
+      const labels  = Object.keys(breakdown).map(c => TH.fmt.categoryLabel(c));
+      const data    = Object.values(breakdown);
+      const colors  = Object.keys(breakdown).map(c => TH.fmt.categoryColor(c));
+
+      const ctx = document.getElementById('categoryChart');
+      if (!ctx) return;
+      if (window._categoryChart) window._categoryChart.destroy();
+      window._categoryChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: colors,
+            borderWidth: 2,
+            borderColor: '#ffffff',
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { font: { size: 11 }, boxWidth: 12, padding: 8 }
+            },
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const mins = ctx.parsed;
+                  const h = Math.floor(mins / 60);
+                  const m = mins % 60;
+                  return ` ${h}時間${m > 0 ? m + '分' : ''}`;
+                }
+              }
+            }
+          },
+          cutout: '65%',
+        }
+      });
+    },
+
+    addLog() {
+      if (!this.logForm.title.trim()) {
+        TH.ui.toast('タイトルを入力してください', 'error');
+        return;
+      }
+      const today = new Date().toISOString().split('T')[0];
+      TH.data.addLog({
+        id: `log_${Date.now()}`,
+        userId: this.user.id,
+        category: this.logForm.category,
+        title: this.logForm.title.trim(),
+        durationMinutes: Number(this.logForm.durationMinutes),
+        loggedAt: today,
+        memo: '',
+        tags: [],
+      });
+      this.logForm.title = '';
+      TH.ui.toast('記録しました！', 'success');
+      this.loadStats();
+      this.$nextTick(() => {
+        TH.ui.renderHeatmap('heatmap', this.user.id, 26);
+        this.renderCategoryChart();
+      });
+    },
+
+    requestConsultation(name) {
+      TH.ui.toast(`相談リクエスト機能は準備中です。${name}さんにSlackで直接メッセージしてください！`, 'info');
+    },
+
+    formatHours(min) { return TH.fmt.totalHours(min); },
+    goToProfile(userId) { TH.nav.go('profile-view', userId); },
+  }
+}
+</script>
+</body>
+</html>

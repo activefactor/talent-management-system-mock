@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>相談窓口 - TalentHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/common.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body x-data="consultationApp()" x-init="init()" x-cloak>
+<div class="app-layout">
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+    <div class="max-w-4xl mx-auto fade-in">
+
+      <!-- ページタイトル -->
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">相談窓口 💬</h1>
+      <p class="text-sm text-gray-500 mb-6">
+        先輩エンジニアに気軽に相談してみましょう。技術的な質問からキャリア相談まで受け付けています。
+      </p>
+
+      <!-- ===== 自分の相談受付設定（seniorロールのみ） ===== -->
+      <template x-if="currentUser?.role === 'senior' || currentUser?.role === 'admin'">
+        <div class="card mb-8 border-l-4 border-indigo-500">
+          <h2 class="text-base font-semibold text-gray-900 mb-4">あなたの相談受付設定</h2>
+
+          <!-- ON/OFF トグル -->
+          <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl mb-4">
+            <div>
+              <p class="font-medium text-gray-900 text-sm">相談を受け付ける</p>
+              <p class="text-xs text-gray-500 mt-0.5">オンにすると相談受付中として一覧に表示されます</p>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" x-model="mySettings.isAccepting">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- 相談タグ -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">受け付ける相談分野</label>
+            <div class="flex flex-wrap gap-2 mb-2" x-show="mySettings.tags.length > 0">
+              <template x-for="tag in mySettings.tags" :key="tag">
+                <span class="skill-tag skill-tag-domain flex items-center gap-1 text-sm">
+                  <span x-text="tag"></span>
+                  <button @click="removeTag(tag)"
+                          class="text-teal-400 hover:text-teal-700 leading-none ml-1">✕</button>
+                </span>
+              </template>
+            </div>
+            <div class="flex gap-2">
+              <input type="text" x-model="newTagInput"
+                     @keydown.enter.prevent="addTag()"
+                     placeholder="例: TypeScript, キャリア相談, コードレビュー"
+                     class="form-input text-sm flex-1">
+              <button @click="addTag()"
+                      class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700
+                             text-sm rounded-lg transition-colors whitespace-nowrap">追加</button>
+            </div>
+          </div>
+
+          <!-- 保存ボタン -->
+          <div class="flex justify-end">
+            <button @click="saveConsultationSettings()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium
+                           px-5 py-2 rounded-lg transition-colors">
+              設定を保存
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- ===== 相談受付中セクション ===== -->
+      <div class="flex items-center gap-3 mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">相談受付中</h2>
+        <span class="badge-chip badge-green text-xs"
+              x-text="`${acceptingSeniors.length}名`"></span>
+      </div>
+
+      <div class="space-y-4 mb-10">
+        <template x-for="u in acceptingSeniors" :key="u.id">
+          <div class="card hover:shadow-md transition-shadow">
+            <div class="flex gap-5">
+
+              <!-- アバター -->
+              <div class="avatar w-16 h-16 text-xl flex-shrink-0"
+                   :style="`background: ${u.avatarColor}`"
+                   x-text="u.avatarInitial"></div>
+
+              <!-- 情報 -->
+              <div class="flex-1 min-w-0">
+
+                <!-- ヘッダー行 -->
+                <div class="flex flex-wrap items-start gap-2 mb-1">
+                  <p class="text-lg font-semibold text-gray-900" x-text="u.name"></p>
+                  <span class="text-xs px-2 py-0.5 rounded-full font-medium mt-0.5"
+                        :class="`role-badge-${u.role}`"
+                        x-text="roleLabel(u.role)"></span>
+                  <span class="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700
+                               px-2 py-0.5 rounded-full font-medium mt-0.5">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8
+                           10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894
+                           3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+                    </svg>
+                    相談受付中
+                  </span>
+                </div>
+
+                <p class="text-sm text-gray-500 mb-3"
+                   x-text="`${u.department} · ${u.position}`"></p>
+
+                <!-- 得意分野タグ -->
+                <div class="mb-3" x-show="(u.consultationTags || []).length > 0">
+                  <p class="text-xs text-gray-500 mb-1.5">得意分野:</p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <template x-for="tag in (u.consultationTags || [])" :key="tag">
+                      <span class="skill-tag skill-tag-domain text-xs" x-text="tag"></span>
+                    </template>
+                    <!-- スキルタグも補完表示 -->
+                    <template x-for="skill in getTopSkills(u, 3)" :key="skill.name">
+                      <span class="skill-tag text-xs"
+                            :class="`skill-tag-${skill.category}`"
+                            x-text="skill.name"></span>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- 自己紹介（2行クランプ） -->
+                <p class="text-sm text-gray-600 line-clamp-2 mb-4"
+                   x-show="u.bio" x-text="u.bio"></p>
+
+                <!-- アクティビティ情報 -->
+                <div class="flex items-center gap-4 text-xs text-gray-400 mb-4">
+                  <span>⏱ 累計 <span class="font-medium text-gray-600" x-text="totalHours(u.id)"></span></span>
+                </div>
+
+                <!-- ボタン行 -->
+                <div class="flex gap-3">
+                  <button @click="goToProfile(u.id)"
+                          class="flex items-center gap-2 border border-gray-200 hover:border-indigo-300
+                                 hover:bg-indigo-50 text-gray-700 hover:text-indigo-700
+                                 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501
+                               20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676
+                               0-5.216-.584-7.499-1.632z"/>
+                    </svg>
+                    プロフィールを見る
+                  </button>
+                  <button @click="showConsultationRequest(u.name)"
+                          class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700
+                                 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0
+                               0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75
+                               0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75
+                               0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764
+                               0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969
+                               0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901
+                               -.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25
+                               9-8.25s9 3.694 9 8.25z"/>
+                    </svg>
+                    相談リクエスト
+                    <span class="text-xs opacity-70">（準備中）</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- 0件 -->
+        <div x-show="acceptingSeniors.length === 0"
+             class="flex flex-col items-center justify-center py-12 text-gray-400">
+          <p class="text-5xl mb-3">🌿</p>
+          <p class="text-base font-medium text-gray-500">現在、相談受付中のエンジニアはいません</p>
+          <p class="text-sm text-gray-400 mt-1">しばらく時間をおいて再度確認してください</p>
+        </div>
+      </div>
+
+      <!-- ===== シニアエンジニア全員 ===== -->
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">シニアエンジニア一覧</h2>
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <template x-for="u in allSeniors" :key="u.id">
+          <div class="card text-center cursor-pointer hover:shadow-md transition-all"
+               :class="u.isAcceptingConsultation ? '' : 'opacity-60 grayscale'"
+               @click="goToProfile(u.id)">
+
+            <!-- アバター -->
+            <div class="avatar w-14 h-14 text-xl mx-auto mb-3"
+                 :style="`background: ${u.avatarColor}`"
+                 x-text="u.avatarInitial"></div>
+
+            <!-- 名前 -->
+            <p class="font-semibold text-gray-900 text-sm mb-0.5" x-text="u.name"></p>
+
+            <!-- 部署・役職 -->
+            <p class="text-xs text-gray-500 mb-2"
+               x-text="`${u.department}`"></p>
+
+            <!-- 受付状態バッジ -->
+            <span x-show="u.isAcceptingConsultation"
+                  class="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700
+                         px-2 py-0.5 rounded-full font-medium">
+              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8
+                     10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894
+                     3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+              </svg>
+              受付中
+            </span>
+            <span x-show="!u.isAcceptingConsultation"
+                  class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-500
+                         px-2 py-0.5 rounded-full font-medium">
+              ⛔ 受付停止
+            </span>
+          </div>
+        </template>
+
+        <!-- シニアがいない場合 -->
+        <div x-show="allSeniors.length === 0"
+             class="col-span-4 text-center py-8 text-gray-400 text-sm">
+          シニアエンジニアが登録されていません
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+function consultationApp() {
+  return {
+    currentUser: null,
+    acceptingSeniors: [],
+    allSeniors: [],
+
+    mySettings: {
+      isAccepting: false,
+      tags: [],
+    },
+    newTagInput: '',
+
+    init() {
+      if (!TH.auth.guard()) return;
+      this.currentUser = TH.auth.getCurrentUser();
+      TH.ui.renderSidebar('sidebar', 'consultation');
+
+      const users = TH.data.getUsers();
+
+      // 自分を除いたシニア・管理者
+      this.allSeniors = users.filter(u =>
+        (u.role === 'senior' || u.role === 'admin') &&
+        u.id !== this.currentUser.id
+      );
+      this.acceptingSeniors = this.allSeniors.filter(u => u.isAcceptingConsultation);
+
+      // 自分がsenior/adminなら設定フォーム初期化
+      if (this.currentUser.role === 'senior' || this.currentUser.role === 'admin') {
+        this.mySettings = {
+          isAccepting: this.currentUser.isAcceptingConsultation || false,
+          tags: [...(this.currentUser.consultationTags || [])],
+        };
+      }
+    },
+
+    saveConsultationSettings() {
+      const updated = {
+        ...this.currentUser,
+        isAcceptingConsultation: this.mySettings.isAccepting,
+        consultationTags: this.mySettings.tags,
+      };
+      TH.data.saveUser(updated);
+      TH.ui.toast('相談設定を保存しました', 'success');
+      setTimeout(() => location.reload(), 600);
+    },
+
+    showConsultationRequest(userName) {
+      TH.ui.toast(
+        `相談リクエスト機能は準備中です。${userName}さんにSlackで直接メッセージしてください！`,
+        'info'
+      );
+    },
+
+    addTag() {
+      const t = this.newTagInput.trim();
+      if (t && !this.mySettings.tags.includes(t)) {
+        this.mySettings.tags.push(t);
+      }
+      this.newTagInput = '';
+    },
+
+    removeTag(tag) {
+      this.mySettings.tags = this.mySettings.tags.filter(t => t !== tag);
+    },
+
+    getTopSkills(user, n) {
+      return (user.skills || [])
+        .slice()
+        .sort((a, b) => b.level - a.level)
+        .slice(0, n || 3);
+    },
+
+    goToProfile(userId) {
+      TH.nav.go('profile-view', userId);
+    },
+
+    totalHours(userId) {
+      return TH.fmt.totalHours(TH.data.getTotalMinutes(userId));
+    },
+
+    roleLabel(role) {
+      return TH.fmt.roleLabel(role);
+    },
+  }
+}
+</script>
+</body>
+</html>
