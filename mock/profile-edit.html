@@ -9,6 +9,7 @@
   <script src="js/data.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/common.js"></script>
+  <script src="js/skill-galaxy.js"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body x-data="profileEditApp()" x-init="init()" x-cloak>
@@ -35,8 +36,10 @@
       <div class="tab-bar mb-6">
         <button class="tab-btn" :class="activeTab === 'basic' && 'active'"
                 @click="activeTab = 'basic'">基本情報</button>
+        <button class="tab-btn" :class="activeTab === 'galaxy' && 'active'"
+                @click="switchToGalaxy()">スキルロードマップ</button>
         <button class="tab-btn" :class="activeTab === 'skills' && 'active'"
-                @click="activeTab = 'skills'">スキル</button>
+                @click="activeTab = 'skills'">スキル一覧</button>
         <button class="tab-btn" :class="activeTab === 'certs' && 'active'"
                 @click="activeTab = 'certs'">資格</button>
         <button class="tab-btn" :class="activeTab === 'personality' && 'active'"
@@ -120,6 +123,556 @@
                          py-2.5 rounded-lg transition-colors">
             基本情報を保存
           </button>
+        </div>
+      </div>
+
+      <!-- ===== スキルロードマップタブ ===== -->
+      <div x-show="activeTab === 'galaxy'">
+        <div class="card">
+          <div class="flex items-start justify-between mb-3 gap-3 flex-wrap">
+            <div>
+              <h2 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                スキルロードマップ（編集）
+                <span x-show="isDirty" class="skill-galaxy-unsaved">● 未保存</span>
+              </h2>
+              <p class="text-xs text-gray-500 mt-0.5">
+                星図は全体像、リストは検索と一気編集向け。どちらも同じデータを編集します。
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="galaxy-view-switcher">
+                <button :class="galaxyView === 'graph' && 'active'"
+                        @click="setGalaxyView('graph')">★ 星図</button>
+                <button :class="galaxyView === 'list' && 'active'"
+                        @click="setGalaxyView('list')">≡ リスト</button>
+              </div>
+              <div class="text-xs text-gray-500">
+                点灯 <span class="font-semibold text-indigo-600" x-text="galaxyLitCount"></span> / <span x-text="galaxyTotalSkillCount"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ルートチップ -->
+          <div class="skill-galaxy-pathbar">
+            <span class="skill-galaxy-pathbar-label">ルート:</span>
+            <button class="skill-galaxy-path-chip"
+                    :class="!selectedPathId && 'active'"
+                    @click="setGalaxyPath(null)">全体</button>
+            <template x-for="p in TH.skillGalaxy.paths" :key="p.id">
+              <button class="skill-galaxy-path-chip"
+                      :class="selectedPathId === p.id && 'active'"
+                      @click="setGalaxyPath(p.id)">
+                <span x-text="p.label"></span>
+                <span class="chip-pct" x-text="`${pathProgressOf(p.id)}%`"></span>
+              </button>
+            </template>
+          </div>
+
+          <!-- 表示モード -->
+          <div class="skill-galaxy-modebar">
+            <span class="skill-galaxy-pathbar-label">表示:</span>
+            <button class="skill-galaxy-mode-chip"
+                    :class="displayMode === 'all' && 'active'"
+                    @click="setDisplayMode('all')">全て</button>
+            <button class="skill-galaxy-mode-chip"
+                    :class="displayMode === 'owned' && 'active'"
+                    @click="setDisplayMode('owned')">習得済</button>
+            <button class="skill-galaxy-mode-chip"
+                    :class="displayMode === 'missing' && 'active'"
+                    @click="setDisplayMode('missing')">未習得</button>
+            <button class="skill-galaxy-mode-chip"
+                    :class="displayMode === 'next' && 'active'"
+                    @click="setDisplayMode('next')">次の候補</button>
+            <span class="ml-auto"></span>
+            <button class="skill-galaxy-mode-chip" @click="resetGalaxyView()">リセット</button>
+            <input type="text" class="skill-galaxy-mode-chip"
+                   style="width:160px"
+                   x-model="galaxySearch"
+                   placeholder="スキルを検索…">
+          </div>
+
+          <!-- ルート進捗 -->
+          <div class="skill-galaxy-route-progress mb-3" x-show="selectedPath">
+            <div class="flex items-center justify-between">
+              <span><strong x-text="selectedPath?.name"></strong> 進捗 <span x-text="pathProgressOf(selectedPathId)"></span>%</span>
+              <span class="text-gray-500 text-xs">通過 <span x-text="pathPassed.length"></span> / 残り <span x-text="pathPending.length"></span></span>
+            </div>
+            <div class="route-bar"><div class="route-fill" :style="`width:${pathProgressOf(selectedPathId)}%`"></div></div>
+            <div class="text-xs text-gray-500">
+              <span x-show="pathPending.length > 0">次に伸ばす: </span>
+              <template x-for="n in pathPending.slice(0, 3)" :key="n.id">
+                <button class="skill-tag skill-tag-language text-xs mr-1"
+                        @click="focusGalaxyNode(n.id)" x-text="n.name"></button>
+              </template>
+            </div>
+          </div>
+
+          <!-- ===== リスト（スキルカタログ） ===== -->
+          <div x-show="galaxyView === 'list'">
+            <div class="skill-catalog">
+              <div class="skill-catalog-side">
+                <div class="skill-catalog-side-title">カテゴリ</div>
+                <button :class="!catalogSubcategory && 'active'"
+                        @click="catalogSubcategory = null">
+                  <span>すべて</span>
+                  <span class="count" x-text="catalogTotalCount"></span>
+                </button>
+                <template x-for="g in catalogAllGroups" :key="g.key">
+                  <button :class="catalogSubcategory === g.key && 'active'"
+                          @click="catalogSubcategory = g.key">
+                    <span x-text="g.label"></span>
+                    <span class="count" x-text="g.items.length"></span>
+                  </button>
+                </template>
+              </div>
+
+              <div class="skill-catalog-main">
+                <div class="skill-catalog-filterbar">
+                  <input type="text" class="skill-catalog-search"
+                         x-model="galaxySearch"
+                         placeholder="スキル名・別名・説明を検索…">
+                  <button class="skill-galaxy-mode-chip"
+                          :class="!catalogLevelBand && 'active'"
+                          @click="catalogLevelBand = null">すべて</button>
+                  <button class="skill-galaxy-mode-chip"
+                          :class="catalogLevelBand === 'missing' && 'active'"
+                          @click="catalogLevelBand = 'missing'">未習得</button>
+                  <button class="skill-galaxy-mode-chip"
+                          :class="catalogLevelBand === 'lv1-2' && 'active'"
+                          @click="catalogLevelBand = 'lv1-2'">Lv1〜2</button>
+                  <button class="skill-galaxy-mode-chip"
+                          :class="catalogLevelBand === 'lv3+' && 'active'"
+                          @click="catalogLevelBand = 'lv3+'">Lv3以上</button>
+                  <button class="skill-galaxy-mode-chip"
+                          :class="catalogCertOnly && 'active'"
+                          @click="catalogCertOnly = !catalogCertOnly">資格のみ</button>
+                </div>
+
+                <template x-if="catalogGroups.length === 0">
+                  <div class="skill-catalog-empty">
+                    <p class="text-3xl mb-1">🔭</p>
+                    <p>該当するスキルがありません</p>
+                  </div>
+                </template>
+
+                <template x-for="group in catalogGroups" :key="group.key">
+                  <div>
+                    <div class="skill-catalog-group-title">
+                      <span x-text="group.label"></span>
+                      <span class="text-gray-500 ml-1" x-text="`(${group.items.length})`"></span>
+                    </div>
+                    <div class="space-y-2">
+                      <template x-for="card in group.items" :key="card.id">
+                        <div class="skill-card"
+                             :class="{
+                               owned: card.owned,
+                               next: nextCandidateIds.has(card.id),
+                               dirty: dirtyNodeIds.has(card.id),
+                               selected: selectedGalaxyNode && selectedGalaxyNode.id === card.id
+                             }"
+                             :style="`--card-color:${laneColorOf(card)}`">
+                          <div class="min-w-0">
+                            <h5>
+                              <span x-text="card.name"></span>
+                              <span x-show="card.kind === 'certification'" class="text-xs"
+                                    style="color:#FDE68A">✦</span>
+                            </h5>
+                            <p class="skill-card-meta">
+                              <span x-text="galaxyLaneLabel(card)"></span>
+                              <span x-show="card.subcategory">
+                                / <span x-text="TH.skillGalaxy.subcategoryLabels[card.subcategory] || card.subcategory"></span>
+                              </span>
+                              <span x-show="card.stage !== undefined">
+                                / Stage <span x-text="card.stage"></span>
+                              </span>
+                            </p>
+                            <p class="skill-card-desc" x-text="card.description"></p>
+                            <div class="skill-card-tags">
+                              <template x-for="pid in (card.pathIds || [])" :key="pid">
+                                <button class="skill-card-tag"
+                                        @click="setGalaxyPath(pid)"
+                                        x-text="(TH.skillGalaxy.paths.find(p => p.id === pid) || {}).label || pid"></button>
+                              </template>
+                              <button class="skill-card-tag"
+                                      @click="goToGraphAndFocus(card.id)">★ 星図で見る</button>
+                              <button class="skill-card-tag"
+                                      x-show="card.levelGuide"
+                                      @click="toggleGuide(card.id)"
+                                      x-text="expandedGuideIds.has(card.id) ? 'レベルガイドを閉じる' : 'レベルガイドを開く'"></button>
+                              <button class="skill-card-tag"
+                                      x-show="card.kind === 'certification'"
+                                      @click="goToCertTab(card)">資格タブで追加</button>
+                            </div>
+                            <div class="skill-card-guide" x-show="expandedGuideIds.has(card.id) && card.levelGuide">
+                              <template x-for="lv in [1,2,3,4,5]" :key="lv">
+                                <div class="skill-card-guide-row" :class="(card.level || 0) === lv && 'current'">
+                                  <span class="lv" x-text="`Lv${lv}`"></span>
+                                  <span x-text="(card.levelGuide || {})[lv] || ''"></span>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+
+                          <div class="skill-card-controls">
+                            <div class="skill-card-level">
+                              <strong x-text="card.level || 0"></strong> / 5
+                            </div>
+
+                            <template x-if="card.kind === 'skill'">
+                              <div>
+                                <div class="galaxy-level-editor">
+                                  <button class="galaxy-level-btn"
+                                          :disabled="(card.level || 0) <= 0"
+                                          @click="setCardLevel(card, (card.level || 0) - 1)">−</button>
+                                  <input type="range" min="0" max="5" step="1"
+                                         class="skill-galaxy-level-slider"
+                                         :value="card.level || 0"
+                                         @input="setCardLevel(card, $event.target.value)">
+                                  <button class="galaxy-level-btn"
+                                          :disabled="(card.level || 0) >= 5"
+                                          @click="setCardLevel(card, (card.level || 0) + 1)">+</button>
+                                </div>
+                                <p class="text-xs text-right" style="color:#94a3b8"
+                                   x-text="TH.skillGalaxy.levelLabels[card.level || 0]"></p>
+                              </div>
+                            </template>
+
+                            <template x-if="card.kind !== 'skill'">
+                              <div class="text-xs" style="color:#94a3b8"
+                                   x-text="TH.skillGalaxy.levelLabels[card.level || 0]"></div>
+                            </template>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <div x-show="galaxyView === 'graph'" class="skill-galaxy-shell">
+            <div class="skill-galaxy-canvas-wrap">
+              <div class="skill-galaxy-search-results"
+                   x-show="galaxySearch.trim().length > 0 && filteredGalaxyNodes.length > 0"
+                   style="top:12px">
+                <template x-for="n in filteredGalaxyNodes" :key="n.id">
+                  <button @click="focusGalaxyNode(n.id); galaxySearch = ''">
+                    <span x-text="n.name"></span>
+                    <span class="text-gray-400 ml-1" x-text="`(${galaxyLaneLabel(n)})`"></span>
+                  </button>
+                </template>
+              </div>
+
+              <button class="skill-galaxy-fullscreen-btn"
+                      @click="openGalaxyFullscreen()">⛶ 全画面</button>
+
+              <canvas id="skillGalaxyCanvas" class="skill-galaxy-canvas"
+                      aria-label="スキルロードマップ"></canvas>
+
+              <div class="skill-galaxy-legend">
+                <span><span class="skill-galaxy-legend-dot" style="background:#F8FAFC"></span>Core</span>
+                <span><span class="skill-galaxy-legend-dot" style="background:#A78BFA"></span>Frontend</span>
+                <span><span class="skill-galaxy-legend-dot" style="background:#34D399"></span>Backend</span>
+                <span><span class="skill-galaxy-legend-dot" style="background:#38BDF8"></span>Cloud</span>
+                <span><span class="skill-galaxy-legend-dot" style="background:#60A5FA"></span>DevOps</span>
+                <span><span class="skill-galaxy-legend-dot" style="background:#A3E635"></span>QA</span>
+                <span><span class="skill-galaxy-legend-dot" style="background:#FB7185"></span>Security</span>
+                <span><span class="skill-galaxy-legend-dot" style="background:#FBBF24"></span>Data/AI</span>
+                <span><span class="skill-galaxy-legend-dot" style="background:#FDE68A"></span>Certification</span>
+              </div>
+            </div>
+
+            <div class="skill-galaxy-panel">
+              <template x-if="!selectedGalaxyNode">
+                <div class="skill-galaxy-panel-empty">
+                  <p class="text-3xl mb-2">✨</p>
+                  <p>星をクリックして編集を始めましょう</p>
+                </div>
+              </template>
+
+              <template x-if="selectedGalaxyNode">
+                <div>
+                  <h4 x-text="selectedGalaxyNode.name"></h4>
+                  <p class="panel-meta">
+                    <span x-text="galaxyLaneLabel(selectedGalaxyNode)"></span>
+                    <span x-show="selectedGalaxyNode.stage !== undefined">
+                      / Stage <span x-text="selectedGalaxyNode.stage"></span>
+                    </span>
+                  </p>
+
+                  <template x-if="selectedGalaxyNode.kind === 'core'">
+                    <div class="space-y-2 mt-2">
+                      <div class="panel-desc" x-text="selectedGalaxyNode.description"></div>
+                      <p class="text-xs text-gray-500">全エンジニアの土台です。</p>
+                    </div>
+                  </template>
+
+                  <template x-if="selectedGalaxyNode.kind === 'skill'">
+                    <div class="space-y-3 mt-2">
+                      <div class="panel-desc" x-text="selectedGalaxyNode.description"></div>
+                      <div>
+                        <div class="panel-section-title">習熟度</div>
+                        <div class="galaxy-level-editor mb-2">
+                          <button class="galaxy-level-btn"
+                                  :disabled="selectedGalaxyLevel <= 0"
+                                  @click="setSelectedGalaxyLevel(selectedGalaxyLevel - 1)">−</button>
+                          <input type="range" min="0" max="5" step="1"
+                                 class="skill-galaxy-level-slider"
+                                 :value="selectedGalaxyLevel"
+                                 @input="setSelectedGalaxyLevel($event.target.value)">
+                          <button class="galaxy-level-btn"
+                                  :disabled="selectedGalaxyLevel >= 5"
+                                  @click="setSelectedGalaxyLevel(selectedGalaxyLevel + 1)">+</button>
+                        </div>
+                        <div class="skill-galaxy-level-row">
+                          <p class="text-xs text-gray-500"
+                             x-text="TH.skillGalaxy.levelLabels[selectedGalaxyLevel || 0]"></p>
+                          <span class="skill-galaxy-level-value"
+                                x-text="`${selectedGalaxyLevel}/5`"></span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">0 にするとスキル一覧から削除されます</p>
+                      </div>
+
+                      <div x-show="selectedPrereqs.length > 0">
+                        <div class="panel-section-title">前提</div>
+                        <div class="flex flex-wrap gap-1.5 mt-1">
+                          <template x-for="n in selectedPrereqs" :key="n.id">
+                            <button class="skill-tag skill-tag-interest text-xs"
+                                    @click="focusGalaxyNode(n.id)" x-text="n.name"></button>
+                          </template>
+                        </div>
+                      </div>
+
+                      <div x-show="selectedNodePaths.length > 0">
+                        <div class="panel-section-title">含まれるルート</div>
+                        <div class="flex flex-wrap gap-1.5 mt-1">
+                          <template x-for="p in selectedNodePaths" :key="p.id">
+                            <button class="skill-galaxy-path-chip"
+                                    :class="selectedPathId === p.id && 'active'"
+                                    @click="setGalaxyPath(p.id)" x-text="p.label"></button>
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="selectedGalaxyNode.kind === 'certification'">
+                    <div class="space-y-3 mt-2">
+                      <div class="panel-desc" x-text="selectedGalaxyNode.description"></div>
+                      <div>
+                        <div class="panel-section-title">状態</div>
+                        <p class="text-sm font-semibold"
+                           :class="selectedGalaxyNode.owned ? 'text-amber-600' : 'text-gray-400'"
+                           x-text="selectedGalaxyNode.owned ? '✦ 取得済み' : '未取得'"></p>
+                      </div>
+                      <button @click="goToCertTab(selectedGalaxyNode)"
+                              class="w-full bg-amber-500 hover:bg-amber-600 text-white
+                                     text-sm font-medium py-2 rounded-lg transition-colors">
+                        資格タブで追加する
+                      </button>
+                    </div>
+                  </template>
+
+                  <template x-if="selectedGalaxyNode.kind === 'role'">
+                    <div class="space-y-3 mt-2">
+                      <div class="panel-desc" x-text="selectedGalaxyNode.description"></div>
+                      <div>
+                        <div class="panel-section-title">到達度</div>
+                        <div class="skill-galaxy-level-row">
+                          <div class="flex-1">
+                            <div class="skill-galaxy-progress">
+                              <div class="skill-galaxy-progress-fill"
+                                   :style="`width:${selectedGalaxyNode.progress || 0}%`"></div>
+                            </div>
+                          </div>
+                          <span class="skill-galaxy-level-value"
+                                x-text="`${selectedGalaxyNode.progress || 0}%`"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="pt-4 mt-4 border-t border-gray-100">
+            <button @click="saveProfile()"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium
+                           py-2.5 rounded-lg transition-colors">
+              保存する
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 全画面モーダル ===== -->
+      <div class="skill-galaxy-modal" x-show="galaxyFullscreen" x-cloak
+           @keydown.escape.window="closeGalaxyFullscreen()">
+        <div class="skill-galaxy-modal-header">
+          <div class="skill-galaxy-modal-title">Skill Roadmap Galaxy（編集）</div>
+          <div class="galaxy-view-switcher">
+            <button :class="galaxyView === 'graph' && 'active'"
+                    @click="setGalaxyView('graph')">★ 星図</button>
+            <button :class="galaxyView === 'list' && 'active'"
+                    @click="setGalaxyView('list')">≡ リスト</button>
+          </div>
+          <div class="skill-galaxy-modal-pathbar">
+            <button class="skill-galaxy-path-chip"
+                    :class="!selectedPathId && 'active'"
+                    @click="setGalaxyPath(null)">全体</button>
+            <template x-for="p in TH.skillGalaxy.paths" :key="p.id">
+              <button class="skill-galaxy-path-chip"
+                      :class="selectedPathId === p.id && 'active'"
+                      @click="setGalaxyPath(p.id)" x-text="p.label"></button>
+            </template>
+          </div>
+          <div class="skill-galaxy-modal-actions">
+            <span x-show="isDirty" class="skill-galaxy-unsaved">● 未保存</span>
+            <button class="skill-galaxy-modal-btn primary"
+                    x-show="isDirty"
+                    @click="saveProfile()">保存</button>
+            <button class="skill-galaxy-modal-btn" @click="closeGalaxyFullscreen()">閉じる (Esc)</button>
+          </div>
+        </div>
+        <div class="skill-galaxy-modal-body">
+          <div class="skill-galaxy-modal-canvas-wrap" x-show="galaxyView === 'graph'">
+            <canvas id="skillGalaxyFsCanvas" class="skill-galaxy-modal-canvas"
+                    aria-label="スキルロードマップ（全画面）"></canvas>
+          </div>
+
+          <div x-show="galaxyView === 'list'"
+               style="position:absolute; inset:0; overflow:auto; padding:18px; background:#0b1024;">
+            <div class="skill-catalog" style="max-width:1200px; margin:0 auto;">
+              <div class="skill-catalog-side">
+                <div class="skill-catalog-side-title">カテゴリ</div>
+                <button :class="!catalogSubcategory && 'active'"
+                        @click="catalogSubcategory = null">
+                  <span>すべて</span>
+                  <span class="count" x-text="catalogTotalCount"></span>
+                </button>
+                <template x-for="g in catalogAllGroups" :key="g.key">
+                  <button :class="catalogSubcategory === g.key && 'active'"
+                          @click="catalogSubcategory = g.key">
+                    <span x-text="g.label"></span>
+                    <span class="count" x-text="g.items.length"></span>
+                  </button>
+                </template>
+              </div>
+              <div class="skill-catalog-main">
+                <div class="skill-catalog-filterbar">
+                  <input type="text" class="skill-catalog-search"
+                         x-model="galaxySearch" placeholder="検索…">
+                  <button class="skill-galaxy-mode-chip"
+                          :class="!catalogLevelBand && 'active'"
+                          @click="catalogLevelBand = null">すべて</button>
+                  <button class="skill-galaxy-mode-chip"
+                          :class="catalogLevelBand === 'missing' && 'active'"
+                          @click="catalogLevelBand = 'missing'">未習得</button>
+                  <button class="skill-galaxy-mode-chip"
+                          :class="catalogLevelBand === 'lv1-2' && 'active'"
+                          @click="catalogLevelBand = 'lv1-2'">Lv1〜2</button>
+                  <button class="skill-galaxy-mode-chip"
+                          :class="catalogLevelBand === 'lv3+' && 'active'"
+                          @click="catalogLevelBand = 'lv3+'">Lv3以上</button>
+                </div>
+                <template x-for="group in catalogGroups" :key="group.key">
+                  <div>
+                    <div class="skill-catalog-group-title" x-text="group.label"></div>
+                    <div class="space-y-2">
+                      <template x-for="card in group.items" :key="card.id">
+                        <div class="skill-card"
+                             :class="{
+                               owned: card.owned,
+                               dirty: dirtyNodeIds.has(card.id),
+                             }"
+                             :style="`--card-color:${laneColorOf(card)}`">
+                          <div class="min-w-0">
+                            <h5 x-text="card.name"></h5>
+                            <p class="skill-card-meta">
+                              <span x-text="galaxyLaneLabel(card)"></span>
+                              <span x-show="card.subcategory">
+                                / <span x-text="TH.skillGalaxy.subcategoryLabels[card.subcategory] || ''"></span>
+                              </span>
+                            </p>
+                            <p class="skill-card-desc" x-text="card.description"></p>
+                          </div>
+                          <div class="skill-card-controls">
+                            <div class="skill-card-level"><strong x-text="card.level || 0"></strong> / 5</div>
+                            <template x-if="card.kind === 'skill'">
+                              <div class="galaxy-level-editor">
+                                <button class="galaxy-level-btn"
+                                        :disabled="(card.level || 0) <= 0"
+                                        @click="setCardLevel(card, (card.level || 0) - 1)">−</button>
+                                <input type="range" min="0" max="5" step="1"
+                                       class="skill-galaxy-level-slider"
+                                       :value="card.level || 0"
+                                       @input="setCardLevel(card, $event.target.value)">
+                                <button class="galaxy-level-btn"
+                                        :disabled="(card.level || 0) >= 5"
+                                        @click="setCardLevel(card, (card.level || 0) + 1)">+</button>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <div class="skill-galaxy-modal-panel" :class="galaxyPanelCollapsed && 'collapsed'">
+            <button class="skill-galaxy-modal-panel-toggle"
+                    @click="galaxyPanelCollapsed = !galaxyPanelCollapsed"
+                    x-text="galaxyPanelCollapsed ? '▲' : '▼'"></button>
+
+            <template x-if="!selectedGalaxyNode">
+              <div class="skill-galaxy-panel-empty" style="color:#94a3b8">
+                <p class="text-2xl mb-1">✨</p>
+                <p>星を選択してください</p>
+              </div>
+            </template>
+
+            <template x-if="selectedGalaxyNode">
+              <div>
+                <h4 x-text="selectedGalaxyNode.name"></h4>
+                <p class="panel-meta" x-text="galaxyLaneLabel(selectedGalaxyNode)"></p>
+
+                <template x-if="selectedGalaxyNode.kind === 'skill'">
+                  <div>
+                    <div class="panel-section-title">習熟度</div>
+                    <div class="galaxy-level-editor mb-2">
+                      <button class="galaxy-level-btn"
+                              :disabled="selectedGalaxyLevel <= 0"
+                              @click="setSelectedGalaxyLevel(selectedGalaxyLevel - 1)">−</button>
+                      <input type="range" min="0" max="5" step="1"
+                             class="skill-galaxy-level-slider"
+                             :value="selectedGalaxyLevel"
+                             @input="setSelectedGalaxyLevel($event.target.value)">
+                      <button class="galaxy-level-btn"
+                              :disabled="selectedGalaxyLevel >= 5"
+                              @click="setSelectedGalaxyLevel(selectedGalaxyLevel + 1)">+</button>
+                    </div>
+                    <p class="text-xs" style="color:#94a3b8"
+                       x-text="`${TH.skillGalaxy.levelLabels[selectedGalaxyLevel || 0]} (${selectedGalaxyLevel}/5)`"></p>
+                  </div>
+                </template>
+
+                <template x-if="selectedGalaxyNode.kind === 'role'">
+                  <div>
+                    <div class="panel-section-title">到達度</div>
+                    <p class="skill-galaxy-level-value"
+                       x-text="`${selectedGalaxyNode.progress || 0}%`"></p>
+                  </div>
+                </template>
+
+                <p class="panel-desc" x-text="selectedGalaxyNode.description"></p>
+              </div>
+            </template>
+          </div>
         </div>
       </div>
 
@@ -413,6 +966,24 @@ function profileEditApp() {
     newSkill: { category: 'language', name: '', level: 3 },
     newCert: { name: '', issuer: '', acquiredAt: '', expiresAt: '' },
 
+    // スキルロードマップ（Step 9 v2）
+    skillGalaxyRenderer: null,
+    skillGalaxyFsRenderer: null,
+    selectedGalaxyNode: null,
+    selectedGalaxyLevel: 0,
+    selectedPathId: null,
+    displayMode: 'all',
+    galaxySearch: '',
+    galaxyFullscreen: false,
+    galaxyPanelCollapsed: false,
+    // v2.1: ビュー切替・カタログ
+    galaxyView: 'graph',
+    catalogSubcategory: null,
+    catalogLevelBand: null,
+    catalogCertOnly: false,
+    expandedGuideIds: new Set(),
+    dirtyNodeIds: new Set(),
+
     allStrengths: [
       '達成欲','調和性','信念','公平性','慎重さ','規律性','集中力','責任感','回復志向',
       '活発性','指令性','コミュニケーション','競争性','最上志向','自己確信','自我','社交性',
@@ -440,7 +1011,7 @@ function profileEditApp() {
     init() {
       if (!TH.auth.guard()) return;
       this.user = TH.auth.getCurrentUser();
-      TH.ui.renderSidebar('sidebar', '');
+      TH.ui.renderSidebar('sidebar', 'profile-edit');
 
       this.editForm = {
         name:        this.user.name        || '',
@@ -506,6 +1077,269 @@ function profileEditApp() {
         localStorage.setItem('th_viewing_user_id', this.user.id);
         window.location.href = 'profile-view.html';
       }, 600);
+    },
+
+    // ===== スキルロードマップ（v2） =====
+    switchToGalaxy() {
+      this.activeTab = 'galaxy';
+      this.$nextTick(() => this.mountSkillGalaxy());
+    },
+
+    mountSkillGalaxy() {
+      const canvas = document.getElementById('skillGalaxyCanvas');
+      if (!canvas) return;
+      if (this.skillGalaxyRenderer) {
+        this.skillGalaxyRenderer.setUser(this.editForm);
+        return;
+      }
+      this.skillGalaxyRenderer = TH.skillGalaxy.createRenderer(canvas, {
+        mode: 'edit',
+        user: this.editForm,
+        editable: true,
+        onSelect: node => {
+          this.selectedGalaxyNode = node;
+          this.selectedGalaxyLevel = node ? (node.level || 0) : 0;
+        },
+      });
+      this.skillGalaxyRenderer.mount();
+    },
+
+    setSelectedGalaxyLevel(level) {
+      if (!this.selectedGalaxyNode || this.selectedGalaxyNode.kind !== 'skill') return;
+      const lv = Math.max(0, Math.min(5, Number(level)));
+      this.selectedGalaxyLevel = lv;
+      TH.skillGalaxy.updateSkillLevel(this.editForm, this.selectedGalaxyNode, lv);
+      const dn = new Set(this.dirtyNodeIds);
+      dn.add(this.selectedGalaxyNode.id);
+      this.dirtyNodeIds = dn;
+      this.isDirty = true;
+      if (this.skillGalaxyRenderer) this.skillGalaxyRenderer.setUser(this.editForm);
+      if (this.skillGalaxyFsRenderer) this.skillGalaxyFsRenderer.setUser(this.editForm);
+    },
+
+    setGalaxyPath(pathId) {
+      this.selectedPathId = pathId || null;
+      this.displayMode = pathId ? 'path' : 'all';
+      if (this.skillGalaxyRenderer) this.skillGalaxyRenderer.setPath(pathId);
+      if (this.skillGalaxyFsRenderer) this.skillGalaxyFsRenderer.setPath(pathId);
+    },
+
+    setDisplayMode(m) {
+      this.displayMode = m;
+      if (m !== 'path') this.selectedPathId = null;
+      if (this.skillGalaxyRenderer) {
+        this.skillGalaxyRenderer.setDisplayMode(m);
+        if (m !== 'path') this.skillGalaxyRenderer.setPath(null);
+      }
+      if (this.skillGalaxyFsRenderer) {
+        this.skillGalaxyFsRenderer.setDisplayMode(m);
+        if (m !== 'path') this.skillGalaxyFsRenderer.setPath(null);
+      }
+    },
+
+    resetGalaxyView() {
+      if (this.skillGalaxyRenderer) this.skillGalaxyRenderer.resetView();
+      if (this.skillGalaxyFsRenderer) this.skillGalaxyFsRenderer.resetView();
+    },
+
+    focusGalaxyNode(nodeId) {
+      const renderer = this.galaxyFullscreen ? this.skillGalaxyFsRenderer : this.skillGalaxyRenderer;
+      if (renderer) renderer.focusNode(nodeId);
+    },
+
+    // 全画面
+    openGalaxyFullscreen() {
+      this.galaxyFullscreen = true;
+      this.$nextTick(() => this.mountSkillGalaxyFs());
+    },
+
+    closeGalaxyFullscreen() {
+      this.galaxyFullscreen = false;
+      if (this.skillGalaxyFsRenderer) {
+        this.skillGalaxyFsRenderer.destroy();
+        this.skillGalaxyFsRenderer = null;
+      }
+    },
+
+    mountSkillGalaxyFs() {
+      const canvas = document.getElementById('skillGalaxyFsCanvas');
+      if (!canvas) return;
+      this.skillGalaxyFsRenderer = TH.skillGalaxy.createRenderer(canvas, {
+        mode: 'edit',
+        user: this.editForm,
+        editable: true,
+        selectedPathId: this.selectedPathId,
+        displayMode: this.displayMode,
+        onSelect: node => {
+          this.selectedGalaxyNode = node;
+          this.selectedGalaxyLevel = node ? (node.level || 0) : 0;
+        },
+      });
+      this.skillGalaxyFsRenderer.mount();
+      if (this.selectedPathId) this.skillGalaxyFsRenderer.setPath(this.selectedPathId);
+      else this.skillGalaxyFsRenderer.setDisplayMode(this.displayMode);
+    },
+
+    galaxyLaneLabel(node) {
+      if (!node) return '';
+      return TH.skillGalaxy.laneLabels[node.lane] || '';
+    },
+
+    // v2.1: ビュー切替・カタログ
+    setGalaxyView(view) {
+      this.galaxyView = view;
+      if (view === 'graph') {
+        this.$nextTick(() => {
+          if (!this.skillGalaxyRenderer) this.mountSkillGalaxy();
+          else this.skillGalaxyRenderer.setUser(this.editForm);
+        });
+      }
+    },
+
+    laneColorOf(node) {
+      const key = node.kind === 'core' ? 'core'
+                : node.kind === 'certification' ? 'certification'
+                : (node.lane || 'core');
+      return (TH.skillGalaxy.laneColors[key] || {}).core || '#6366F1';
+    },
+
+    toggleGuide(nodeId) {
+      const next = new Set(this.expandedGuideIds);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      this.expandedGuideIds = next;
+    },
+
+    setCardLevel(node, level) {
+      if (!node || node.kind !== 'skill') return;
+      const lv = Math.max(0, Math.min(5, Number(level)));
+      TH.skillGalaxy.updateSkillLevel(this.editForm, node, lv);
+      const next = new Set(this.dirtyNodeIds);
+      next.add(node.id);
+      this.dirtyNodeIds = next;
+      this.isDirty = true;
+      if (this.skillGalaxyRenderer) this.skillGalaxyRenderer.setUser(this.editForm);
+      if (this.skillGalaxyFsRenderer) this.skillGalaxyFsRenderer.setUser(this.editForm);
+      if (this.selectedGalaxyNode && this.selectedGalaxyNode.id === node.id) {
+        this.selectedGalaxyLevel = lv;
+      }
+    },
+
+    goToGraphAndFocus(nodeId) {
+      this.setGalaxyView('graph');
+      this.$nextTick(() => this.focusGalaxyNode(nodeId));
+    },
+
+    // ===== catalog computed =====
+    get catalogAllState() {
+      return TH.skillGalaxy.getCatalogState(this.editForm);
+    },
+
+    get catalogAllGroups() {
+      return TH.skillGalaxy.groupBySubcategory(this.catalogAllState);
+    },
+
+    get catalogTotalCount() {
+      return this.catalogAllState.length;
+    },
+
+    get nextCandidateIds() {
+      const ids = new Set();
+      this.catalogAllState.forEach(n => {
+        if (n.kind !== 'skill' || n.owned) return;
+        const prereqs = n.prerequisiteIds || [];
+        const ok = prereqs.length === 0 || prereqs.every(pid => {
+          const p = this.galaxyState.find(x => x.id === pid);
+          return p && (p.owned || p.kind === 'core');
+        });
+        if (ok) ids.add(n.id);
+      });
+      return ids;
+    },
+
+    get catalogFiltered() {
+      return TH.skillGalaxy.filterCatalog(this.catalogAllState, {
+        keyword: this.galaxySearch,
+        subcategory: this.catalogSubcategory,
+        pathId: this.selectedPathId,
+        levelBand: this.catalogLevelBand,
+        certOnly: this.catalogCertOnly,
+      });
+    },
+
+    get catalogSorted() {
+      return TH.skillGalaxy.sortCatalog(this.catalogFiltered, { pathId: this.selectedPathId });
+    },
+
+    get catalogGroups() {
+      return TH.skillGalaxy.groupBySubcategory(this.catalogSorted);
+    },
+
+    pathProgressOf(pathId) {
+      if (!pathId) return 0;
+      const path = TH.skillGalaxy.paths.find(p => p.id === pathId);
+      if (!path) return 0;
+      return TH.skillGalaxy.calcPathProgress(this.editForm, path);
+    },
+
+    goToCertTab(node) {
+      this.activeTab = 'certs';
+      this.closeGalaxyFullscreen();
+      if (node) {
+        const exists = this.editForm.certifications.some(c =>
+          TH.skillGalaxy.nodeMatchesName(node, c.name));
+        if (!exists) this.newCert.name = node.name;
+      }
+    },
+
+    get galaxyState() {
+      return this.skillGalaxyRenderer
+        ? this.skillGalaxyRenderer.getState()
+        : TH.skillGalaxy.buildUserGalaxyState(this.editForm);
+    },
+
+    get selectedPath() {
+      if (!this.selectedPathId) return null;
+      return TH.skillGalaxy.paths.find(p => p.id === this.selectedPathId) || null;
+    },
+
+    get pathPassed() {
+      if (!this.selectedPath) return [];
+      return TH.skillGalaxy.getPathPassedNodes(this.galaxyState, this.selectedPath);
+    },
+
+    get pathPending() {
+      if (!this.selectedPath) return [];
+      return TH.skillGalaxy.getPathPendingNodes(this.galaxyState, this.selectedPath);
+    },
+
+    get filteredGalaxyNodes() {
+      const q = this.galaxySearch.trim().toLowerCase();
+      if (!q) return [];
+      return this.galaxyState
+        .filter(n => n.name.toLowerCase().includes(q) ||
+                     (n.aliases || []).some(a => a.toLowerCase().includes(q)))
+        .slice(0, 8);
+    },
+
+    get galaxyLitCount() {
+      return this.galaxyState.filter(n => n.kind === 'skill' && n.owned).length;
+    },
+
+    get galaxyTotalSkillCount() {
+      return this.galaxyState.filter(n => n.kind === 'skill').length;
+    },
+
+    get selectedPrereqs() {
+      if (!this.selectedGalaxyNode) return [];
+      return TH.skillGalaxy.getPrerequisiteNodes(this.galaxyState, this.selectedGalaxyNode.id)
+        .filter(n => n.kind !== 'core');
+    },
+
+    get selectedNodePaths() {
+      if (!this.selectedGalaxyNode) return [];
+      const ids = TH.skillGalaxy.getNodePathIds(this.selectedGalaxyNode.id);
+      return TH.skillGalaxy.paths.filter(p => ids.includes(p.id));
     },
 
     // スキル操作

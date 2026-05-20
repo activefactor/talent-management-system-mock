@@ -30,7 +30,8 @@ mock/
 └── js/
     ├── data.js           # シードデータ定義 + localStorage CRUD
     ├── auth.js           # モック認証ヘルパー
-    └── common.js         # 共通ユーティリティ・ナビ生成
+    ├── common.js         # 共通ユーティリティ・ナビ生成
+    └── skill-galaxy.js   # 個人プロフィール用スキル星図（Step 9）
 ```
 
 ---
@@ -53,6 +54,9 @@ mock/
 <script src="js/data.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/common.js"></script>
+
+<!-- スキルギャラクシーを使う画面のみ -->
+<script src="js/skill-galaxy.js"></script>
 
 <!-- 共通CSS -->
 <link rel="stylesheet" href="css/style.css">
@@ -187,8 +191,9 @@ dashboard.html
 | Step 6 | step6-learning-log.md | `learning-log.html` | 中 |
 | Step 7 | step7-admin.md | `admin.html` | 中 |
 | Step 8 | step8-consultation.md | `consultation.html` | 低 |
+| Step 9 | step9-skill-galaxy.md | `profile-view.html` / `profile-edit.html` / `js/skill-galaxy.js` | 中 |
 
-**推奨実装順**: Step1 → Step2 → Step3 → Step5 → Step4 → Step6 → Step7 → Step8
+**推奨実装順**: Step1 → Step2 → Step3 → Step5 → Step9 → Step4 → Step6 → Step7 → Step8
 
 ---
 
@@ -311,3 +316,4 @@ const STRENGTHS_DOMAIN_MAP = {
 - [ ] Step 6: 学習ログ（learning-log.html）
 - [ ] Step 7: 管理者ダッシュボード（admin.html）
 - [ ] Step 8: 相談窓口（consultation.html）
+- [ ] Step 9: スキルギャラクシー（profile-view.html / profile-edit.html / skill-galaxy.js）

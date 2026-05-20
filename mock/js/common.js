@@ -30,6 +30,21 @@ TH.nav = {
     const path = map[screen];
     if (path) window.location.href = path;
   },
+
+  /** 自分のプロフィールへ確実に遷移する */
+  goMyProfile() {
+    const me = TH.auth.getCurrentUser();
+    if (!me) return;
+    TH.nav.go('profile-view', me.id);
+  },
+
+  /** 自分のプロフィール編集画面へ */
+  goMyProfileEdit() {
+    const me = TH.auth.getCurrentUser();
+    if (!me) return;
+    localStorage.setItem('th_viewing_user_id', me.id);
+    window.location.href = 'profile-edit.html';
+  },
 };
 
 // ── フォーマット関数 ────────────────────────────────────────────
@@ -250,6 +265,7 @@ TH.ui = {
 
     const navItems = [
       { screen: 'dashboard',    label: 'ダッシュボード', icon: _icons.home  },
+      { screen: 'profile-view', label: 'マイプロフィール', icon: _icons.user, match: 'profile', action: 'TH.nav.goMyProfile()' },
       { screen: 'members',      label: 'メンバー検索',   icon: _icons.users },
       { screen: 'learning-log', label: '学習ログ',       icon: _icons.book  },
       { screen: 'consultation', label: '相談窓口',       icon: _icons.chat  },
@@ -259,9 +275,15 @@ TH.ui = {
       { screen: 'admin', label: 'スキルマップ', icon: _icons.chart },
     ];
 
+    const isActive = item => {
+      if (!activeScreen) return false;
+      if (item.match) return activeScreen.startsWith(item.match);
+      return activeScreen === item.screen;
+    };
+
     const makeItem = item => `
-      <div class="sidebar-nav-item ${activeScreen === item.screen ? 'active' : ''}"
-           onclick="TH.nav.go('${item.screen}')">
+      <div class="sidebar-nav-item ${isActive(item) ? 'active' : ''}"
+           onclick="${item.action || `TH.nav.go('${item.screen}')`}">
         ${item.icon}
         <span>${item.label}</span>
       </div>`;
@@ -287,14 +309,21 @@ TH.ui = {
         </div>
       </div>
 
-      <!-- ユーザー情報 -->
-      <div style="padding:16px;border-bottom:1px solid #F3F4F6;">
+      <!-- ユーザー情報（クリックで自分のプロフィールへ） -->
+      <div class="sidebar-user-card" onclick="TH.nav.goMyProfile()"
+           title="マイプロフィールを開く"
+           style="padding:16px;border-bottom:1px solid #F3F4F6;cursor:pointer;transition:background-color 0.15s;"
+           onmouseover="this.style.backgroundColor='#F9FAFB'"
+           onmouseout="this.style.backgroundColor=''">
         <div style="display:flex;align-items:center;gap:12px;">
           <div class="avatar" style="width:40px;height:40px;font-size:16px;background:${user.avatarColor};">${initial}</div>
-          <div style="min-width:0;">
+          <div style="min-width:0;flex:1;">
             <div style="font-weight:600;color:#111827;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${user.name}</div>
             <div style="font-size:11px;color:#6B7280;margin-top:1px;">${user.department} · ${roleLabel}</div>
           </div>
+          <svg style="width:14px;height:14px;color:#9CA3AF;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/>
+          </svg>
         </div>
         <div style="margin-top:8px;font-size:12px;color:#6B7280;">
           累計 <span style="font-weight:600;color:#374151;">${TH.fmt.totalHours(totalMin)}</span>
@@ -345,6 +374,10 @@ const _icons = {
 
   pencil: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/>
+  </svg>`,
+
+  user: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
   </svg>`,
 
   trash: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
